@@ -8,25 +8,25 @@ $vehicleModel = new Vehicle();
 
 $requestId = Security::sanitizeInt($_GET['id'] ?? 0);
 if (!$requestId) {
-    redirect(url('../../admin/quote-requests.php'));
+    redirect(url('admin/quote-requests.php'));
 }
 
 $request = $quoteRequestModel->findById($requestId);
 if (!$request) {
     setErrors(['general' => 'Quote request not found']);
-    redirect(url('../../admin/quote-requests.php'));
+    redirect(url('admin/quote-requests.php'));
 }
 
 // Check if already converted
 if ($request['order_id']) {
     setErrors(['general' => 'This quote request has already been converted to an order']);
-    redirect('../../admin/quote-requests/view.php?id=' . $requestId);
+    redirect(url('admin/quote-requests/view.php?id=' . $requestId));
 }
 
 // Check if quote is ready
 if (!$request['quoted_price'] || !$request['shipping_cost'] || !$request['duty_estimate']) {
     setErrors(['general' => 'Please add a quote before converting to an order']);
-    redirect('../../admin/quote-requests/view.php?id=' . $requestId);
+    redirect(url('admin/quote-requests/view.php?id=' . $requestId));
 }
 
 // Handle form submission
@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // CSRF protection
     if (!isset($_POST['csrf_token']) || !Security::verifyToken($_POST['csrf_token'])) {
         setErrors(['general' => 'Invalid security token. Please try again.']);
-        redirect('../../admin/quote-requests/convert.php?id=' . $requestId);
+        redirect(url('admin/quote-requests/convert.php?id=' . $requestId));
     }
     
     // Validate status first

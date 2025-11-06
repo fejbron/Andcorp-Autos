@@ -6,13 +6,13 @@ $quoteRequestModel = new QuoteRequest();
 
 $requestId = Security::sanitizeInt($_GET['id'] ?? 0);
 if (!$requestId) {
-    redirect(url('../../admin/quote-requests.php'));
+    redirect(url('admin/quote-requests.php'));
 }
 
 $request = $quoteRequestModel->findById($requestId);
 if (!$request) {
     setErrors(['general' => 'Quote request not found']);
-    redirect(url('../../admin/quote-requests.php'));
+    redirect(url('admin/quote-requests.php'));
 }
 
 // Handle quote submission
