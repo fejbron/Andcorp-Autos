@@ -35,78 +35,111 @@ if ($user['role'] === 'customer' && $order['user_id'] != $user['id']) {
 
 // Handle file upload - only admin/staff can upload
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['document']) && $canUpload) {
-    // CSRF check
-    if (!Security::verifyToken($_POST['csrf_token'] ?? '')) {
-        $_SESSION['error'] = 'Invalid security token';
-    } else {
-        $documentType = Security::sanitizeString($_POST['document_type'] ?? '', 50);
-        
-        // Validate document type
-        $validator = new Validator();
-        $validator->in($documentType, ['car_image', 'title', 'bill_of_lading', 'bill_of_entry'], 'Invalid document type');
-        
-        if ($validator->fails()) {
-            $_SESSION['error'] = implode(', ', $validator->getErrors());
+    try {
+        // CSRF check
+        if (!Security::verifyToken($_POST['csrf_token'] ?? '')) {
+            $_SESSION['error'] = 'Invalid security token';
         } else {
-            $file = $_FILES['document'];
+            $documentType = Security::sanitizeString($_POST['document_type'] ?? '', 50);
             
-            // Validate file
-            $validation = Security::validateFileUpload($file, [
-                'allowed_types' => ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'],
-                'max_size' => 10 * 1024 * 1024 // 10MB
-            ]);
-            
-            if ($validation['valid']) {
-                $uploadDir = __DIR__ . '/../uploads/' . ($documentType === 'car_image' ? 'cars' : 'documents');
-                
-                // Create directory if it doesn't exist
-                if (!is_dir($uploadDir)) {
-                    if (!mkdir($uploadDir, 0755, true)) {
-                        $_SESSION['error'] = 'Failed to create upload directory. Please contact administrator.';
-                        redirect(url('orders/documents.php?id=' . $orderId));
-                        exit;
-                    }
-                }
-                
-                // Generate secure filename
-                $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
-                $secureFilename = bin2hex(random_bytes(16)) . '.' . $extension;
-                $uploadPath = $uploadDir . '/' . $secureFilename;
-                $relativePath = 'uploads/' . ($documentType === 'car_image' ? 'cars' : 'documents') . '/' . $secureFilename;
-                
-                if (move_uploaded_file($file['tmp_name'], $uploadPath)) {
-                    // Set proper file permissions
-                    chmod($uploadPath, 0644);
-                    // Save to database
-                    $stmt = $db->prepare("
-                        INSERT INTO order_documents 
-                        (order_id, document_type, file_name, file_path, file_size, uploaded_by)
-                        VALUES (?, ?, ?, ?, ?, ?)
-                    ");
-                    
-                    $stmt->execute([
-                        $orderId,
-                        $documentType,
-                        Security::sanitizeString($file['name'], 255),
-                        Security::sanitizeString($relativePath, 500),
-                        (int)$file['size'],
-                        $user['id']
-                    ]);
-                    
-                    $_SESSION['success'] = 'Document uploaded successfully!';
-                    
-                    // Log activity
-                    Auth::logOrderActivity($orderId, $user['id'], 'document_uploaded', 
-                        "Uploaded {$documentType} document");
-                    
-                    redirect(url('orders/documents.php?id=' . $orderId));
-                } else {
-                    $_SESSION['error'] = 'Failed to upload file. Please try again.';
-                }
+            // Validate document type
+            $allowedDocTypes = ['car_image', 'title', 'bill_of_lading', 'bill_of_entry', 'evidence_of_delivery'];
+            if (!in_array($documentType, $allowedDocTypes, true)) {
+                $_SESSION['error'] = 'Invalid document type selected';
             } else {
-                $_SESSION['error'] = $validation['error'];
+                $file = $_FILES['document'];
+                
+                // Validate file - validateFileUpload expects (file, allowedTypes array, maxSize)
+                $allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+                $maxSize = 10 * 1024 * 1024; // 10MB
+                $validation = Security::validateFileUpload($file, $allowedMimeTypes, $maxSize);
+                
+                if ($validation['valid']) {
+                    $uploadDir = __DIR__ . '/../uploads/' . ($documentType === 'car_image' ? 'cars' : 'documents');
+                    
+                    // Create directory if it doesn't exist
+                    if (!is_dir($uploadDir)) {
+                        if (!mkdir($uploadDir, 0755, true)) {
+                            $_SESSION['error'] = 'Failed to create upload directory. Please contact administrator.';
+                            redirect(url('orders/documents.php?id=' . $orderId));
+                            exit;
+                        }
+                    }
+                    
+                    // Generate secure filename
+                    $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+                    $secureFilename = bin2hex(random_bytes(16)) . '.' . $extension;
+                    $uploadPath = $uploadDir . '/' . $secureFilename;
+                    $relativePath = 'uploads/' . ($documentType === 'car_image' ? 'cars' : 'documents') . '/' . $secureFilename;
+                    
+                    if (move_uploaded_file($file['tmp_name'], $uploadPath)) {
+                        // Set proper file permissions
+                        @chmod($uploadPath, 0644);
+                        
+                        try {
+                            // Save to database
+                            $stmt = $db->prepare("
+                                INSERT INTO order_documents 
+                                (order_id, document_type, file_name, file_path, file_size, uploaded_by)
+                                VALUES (?, ?, ?, ?, ?, ?)
+                            ");
+                            
+                            $stmt->execute([
+                                $orderId,
+                                $documentType,
+                                Security::sanitizeString($file['name'], 255),
+                                Security::sanitizeString($relativePath, 500),
+                                (int)$file['size'],
+                                $user['id']
+                            ]);
+                            
+                            $_SESSION['success'] = 'Document uploaded successfully!';
+                            
+                            // Log activity
+                            try {
+                                Auth::logOrderActivity($orderId, $user['id'], 'document_uploaded', 
+                                    "Uploaded {$documentType} document");
+                            } catch (Exception $e) {
+                                // Don't fail if logging fails
+                                error_log("Failed to log document upload: " . $e->getMessage());
+                            }
+                            
+                            redirect(url('orders/documents.php?id=' . $orderId));
+                        } catch (PDOException $e) {
+                            // Delete uploaded file if database insert fails
+                            @unlink($uploadPath);
+                            
+                            // Check if it's an ENUM value error
+                            $errorCode = $e->getCode();
+                            $errorMessage = $e->getMessage();
+                            if (strpos($errorMessage, 'document_type') !== false || 
+                                strpos($errorMessage, 'Data truncated') !== false ||
+                                strpos($errorMessage, '1265') !== false ||
+                                $errorCode == '1265' ||
+                                (is_string($errorCode) && strpos($errorCode, '1265') !== false)) {
+                                $_SESSION['error'] = 'The document type "Evidence of Delivery" is not yet enabled in the database. Please contact the administrator to run the database migration.';
+                                error_log("Document type ENUM error for 'evidence_of_delivery': " . $errorMessage . " (Code: " . $errorCode . ")");
+                            } else {
+                                $_SESSION['error'] = 'Failed to save document to database. Please try again or contact support.';
+                                error_log("Database error saving document: " . $errorMessage . " (Code: " . $errorCode . ")");
+                            }
+                        } catch (Exception $e) {
+                            // Delete uploaded file if database insert fails
+                            @unlink($uploadPath);
+                            $_SESSION['error'] = 'An error occurred: ' . $e->getMessage();
+                            error_log("Error uploading document: " . $e->getMessage());
+                        }
+                    } else {
+                        $_SESSION['error'] = 'Failed to upload file. Please try again.';
+                    }
+                } else {
+                    $_SESSION['error'] = $validation['error'] ?? 'File validation failed';
+                }
             }
         }
+    } catch (Exception $e) {
+        $_SESSION['error'] = 'An error occurred during upload: ' . $e->getMessage();
+        error_log("Document upload error: " . $e->getMessage() . " | Trace: " . $e->getTraceAsString());
     }
 }
 
@@ -155,11 +188,17 @@ $groupedDocs = [
     'car_image' => [],
     'title' => [],
     'bill_of_lading' => [],
-    'bill_of_entry' => []
+    'bill_of_entry' => [],
+    'evidence_of_delivery' => []
 ];
 
 foreach ($documents as $doc) {
-    $groupedDocs[$doc['document_type']][] = $doc;
+    if (isset($groupedDocs[$doc['document_type']])) {
+        $groupedDocs[$doc['document_type']][] = $doc;
+    } else {
+        // Handle any unexpected document types
+        $groupedDocs[$doc['document_type']] = [$doc];
+    }
 }
 
 $title = "Order Documents - " . $order['order_number'];
@@ -253,6 +292,7 @@ $title = "Order Documents - " . $order['order_number'];
                                     <option value="title">Car Title</option>
                                     <option value="bill_of_lading">Bill of Lading</option>
                                     <option value="bill_of_entry">Bill of Entry / Duty</option>
+                                    <option value="evidence_of_delivery">Evidence of Delivery</option>
                                 </select>
                             </div>
                             
@@ -287,6 +327,7 @@ $title = "Order Documents - " . $order['order_number'];
                                 'title' => 'file-text',
                                 'bill_of_lading' => 'ship',
                                 'bill_of_entry' => 'receipt',
+                                'evidence_of_delivery' => 'check-circle',
                                 default => 'file'
                             };
                         ?>"></i>
@@ -296,6 +337,7 @@ $title = "Order Documents - " . $order['order_number'];
                                 'title' => 'Car Title',
                                 'bill_of_lading' => 'Bill of Lading',
                                 'bill_of_entry' => 'Bill of Entry / Duty',
+                                'evidence_of_delivery' => 'Evidence of Delivery',
                                 default => ucwords(str_replace('_', ' ', $type))
                             };
                         ?>
