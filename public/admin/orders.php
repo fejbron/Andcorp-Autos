@@ -12,18 +12,20 @@ $searchQuery = Security::sanitizeString($_GET['search'] ?? '', 255);
 
 // Get orders
 if ($searchQuery) {
+    $searchTerm = "%{$searchQuery}%";
     $sql = "SELECT o.*, u.first_name, u.last_name, u.email 
             FROM orders o
             JOIN customers c ON o.customer_id = c.id
             JOIN users u ON c.user_id = u.id
-            WHERE o.order_number LIKE :search 
-            OR u.first_name LIKE :search 
-            OR u.last_name LIKE :search
-            OR u.email LIKE :search
+            WHERE o.order_number LIKE ? 
+            OR u.first_name LIKE ? 
+            OR u.last_name LIKE ?
+            OR u.email LIKE ?
             ORDER BY o.created_at DESC
             LIMIT 100";
     $stmt = $db->prepare($sql);
-    $stmt->execute([':search' => "%{$searchQuery}%"]);
+    // Pass the search term 4 times (once for each ? placeholder)
+    $stmt->execute([$searchTerm, $searchTerm, $searchTerm, $searchTerm]);
     $orders = $stmt->fetchAll();
 } else {
     $orders = $orderModel->getAll($statusFilter, 100, 0);

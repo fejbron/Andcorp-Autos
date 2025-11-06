@@ -82,18 +82,24 @@ class Auth {
         if (!self::check()) {
             // Store the intended destination for redirect after login
             // Use absolute URL to ensure it works correctly after login
+            // REQUEST_URI includes the query string, so we preserve it
             if (!empty($_SERVER['REQUEST_URI'])) {
                 $requestUri = $_SERVER['REQUEST_URI'];
-                // If it's not already an absolute URL, make it one
+                
+                // Ensure we have the full URL with query string
+                // REQUEST_URI already includes query string, so we use it as-is
                 if (strpos($requestUri, 'http://') !== 0 && strpos($requestUri, 'https://') !== 0) {
                     $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
                     $host = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? '';
                     if (!empty($host)) {
+                        // Build absolute URL with query string preserved
                         $_SESSION['redirect_after_login'] = $protocol . $host . $requestUri;
                     } else {
+                        // Fallback: store relative URI with query string
                         $_SESSION['redirect_after_login'] = $requestUri;
                     }
                 } else {
+                    // Already absolute URL
                     $_SESSION['redirect_after_login'] = $requestUri;
                 }
             }

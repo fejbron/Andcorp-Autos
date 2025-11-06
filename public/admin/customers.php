@@ -7,58 +7,112 @@ $orderModel = new Order();
 $db = Database::getInstance()->getConnection();
 
 $searchQuery = Security::sanitizeString($_GET['search'] ?? '', 255);
+$errors = [];
 
 // Get customers
-if ($searchQuery) {
-    $db = Database::getInstance()->getConnection();
-    $sql = "SELECT c.*, u.email, u.first_name, u.last_name, u.phone, u.is_active, u.created_at
-            FROM customers c
-            JOIN users u ON c.user_id = u.id
-            WHERE u.first_name LIKE :search 
-            OR u.last_name LIKE :search
-            OR u.email LIKE :search
-            OR u.phone LIKE :search
-            ORDER BY u.created_at DESC
-            LIMIT 100";
-    $stmt = $db->prepare($sql);
-    $stmt->execute([':search' => "%{$searchQuery}%"]);
-    $customers = $stmt->fetchAll();
-} else {
-    $customers = $customerModel->getAll();
+try {
+    if ($searchQuery) {
+        $db = Database::getInstance()->getConnection();
+        $searchTerm = "%{$searchQuery}%";
+        $sql = "SELECT c.*, u.email, u.first_name, u.last_name, u.phone, u.is_active, u.created_at as user_created_at
+                FROM customers c
+                JOIN users u ON c.user_id = u.id
+                WHERE u.first_name LIKE ? 
+                OR u.last_name LIKE ?
+                OR u.email LIKE ?
+                OR u.phone LIKE ?
+                ORDER BY u.created_at DESC
+                LIMIT 100";
+        $stmt = $db->prepare($sql);
+        // Pass the search term 4 times (once for each ? placeholder)
+        $stmt->execute([$searchTerm, $searchTerm, $searchTerm, $searchTerm]);
+        $customers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } else {
+        $customers = $customerModel->getAll();
+        // Ensure consistent format (associative array)
+        if (!empty($customers) && is_array($customers)) {
+            $customers = array_map(function($customer) {
+                if (is_array($customer)) {
+                    return $customer;
+                }
+                // Convert object to array if needed
+                return (array)$customer;
+            }, $customers);
+        }
+    }
+    
+    // Ensure customers is always an array
+    if (!is_array($customers)) {
+        $customers = [];
+    }
+} catch (PDOException $e) {
+    error_log("Database error fetching customers: " . $e->getMessage());
+    error_log("SQL State: " . $e->getCode());
+    error_log("Error Info: " . print_r($e->errorInfo, true));
+    $customers = [];
+    // Show detailed error for debugging
+    $errorDetails = $e->getMessage();
+    if (isset($e->errorInfo[2])) {
+        $errorDetails .= " - " . $e->errorInfo[2];
+    }
+    $errors['general'] = 'Database error: ' . htmlspecialchars($errorDetails);
+} catch (Exception $e) {
+    error_log("Error fetching customers: " . $e->getMessage());
+    error_log("Error class: " . get_class($e));
+    error_log("Stack trace: " . $e->getTraceAsString());
+    $customers = [];
+    // Show actual error message
+    $errors['general'] = 'Error: ' . htmlspecialchars($e->getMessage());
 }
 
 // Optimize: Get order counts in one query instead of N+1
-$customerIds = array_column($customers, 'id');
 $customersWithOrders = [];
 
+// Ensure customers is an array
+if (!is_array($customers)) {
+    $customers = [];
+}
+
+$customerIds = !empty($customers) ? array_column($customers, 'id') : [];
+
 if (!empty($customerIds)) {
-    $placeholders = implode(',', array_fill(0, count($customerIds), '?'));
-    $orderSql = "SELECT 
-                    o.customer_id, 
-                    COUNT(DISTINCT o.id) as order_count, 
-                    COALESCE(SUM(d.amount), 0) as total_spent 
-                 FROM orders o
-                 LEFT JOIN deposits d ON o.id = d.order_id AND d.status = 'verified'
-                 WHERE o.customer_id IN ($placeholders)
-                 GROUP BY o.customer_id";
-    $orderStmt = $db->prepare($orderSql);
-    $orderStmt->execute($customerIds);
-    $orderStats = $orderStmt->fetchAll();
-    
-    // Create lookup array
-    $statsLookup = [];
-    foreach ($orderStats as $stat) {
-        $statsLookup[$stat['customer_id']] = [
-            'order_count' => (int)$stat['order_count'],
-            'total_spent' => (float)($stat['total_spent'] ?? 0)
-        ];
-    }
-    
-    // Merge stats with customers
-    foreach ($customers as $customer) {
-        $customer['order_count'] = $statsLookup[$customer['id']]['order_count'] ?? 0;
-        $customer['total_spent'] = $statsLookup[$customer['id']]['total_spent'] ?? 0;
-        $customersWithOrders[] = $customer;
+    try {
+        $placeholders = implode(',', array_fill(0, count($customerIds), '?'));
+        $orderSql = "SELECT 
+                        o.customer_id, 
+                        COUNT(DISTINCT o.id) as order_count, 
+                        COALESCE(SUM(d.amount), 0) as total_spent 
+                     FROM orders o
+                     LEFT JOIN deposits d ON o.id = d.order_id AND d.status = 'verified'
+                     WHERE o.customer_id IN ($placeholders)
+                     GROUP BY o.customer_id";
+        $orderStmt = $db->prepare($orderSql);
+        $orderStmt->execute($customerIds);
+        $orderStats = $orderStmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Create lookup array
+        $statsLookup = [];
+        foreach ($orderStats as $stat) {
+            $statsLookup[$stat['customer_id']] = [
+                'order_count' => (int)$stat['order_count'],
+                'total_spent' => (float)($stat['total_spent'] ?? 0)
+            ];
+        }
+        
+        // Merge stats with customers
+        foreach ($customers as $customer) {
+            $customer['order_count'] = $statsLookup[$customer['id']]['order_count'] ?? 0;
+            $customer['total_spent'] = $statsLookup[$customer['id']]['total_spent'] ?? 0;
+            $customersWithOrders[] = $customer;
+        }
+    } catch (Exception $e) {
+        error_log("Error fetching order stats: " . $e->getMessage());
+        // If order stats fail, just use customers without stats
+        foreach ($customers as $customer) {
+            $customer['order_count'] = 0;
+            $customer['total_spent'] = 0;
+            $customersWithOrders[] = $customer;
+        }
     }
 } else {
     $customersWithOrders = $customers;
@@ -93,10 +147,17 @@ if (!empty($customerIds)) {
             </div>
         <?php endif; ?>
 
+        <?php if (isset($errors['general'])): ?>
+            <div class="alert alert-danger alert-dismissible fade show">
+                <i class="bi bi-exclamation-circle"></i> <?php echo htmlspecialchars($errors['general']); ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        <?php endif; ?>
+
         <!-- Search -->
         <div class="card-modern mb-4 animate-in">
             <div class="card-body">
-                <form method="GET" action="<?php echo htmlspecialchars($_SERVER['PHP_SELF']); ?>" class="row g-3">
+                <form method="GET" action="<?php echo htmlspecialchars($_SERVER['PHP_SELF'] ?? 'customers.php'); ?>" class="row g-3">
                     <div class="col-md-8">
                         <label for="search" class="form-label">Search Customers</label>
                         <input type="text" class="form-control" id="search" name="search" 
@@ -158,7 +219,12 @@ if (!empty($customerIds)) {
         <!-- Customers Table -->
         <div class="card-modern animate-in">
             <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-people"></i> Customers (<?php echo count($customersWithOrders); ?>)</h5>
+                <h5 class="mb-0">
+                    <i class="bi bi-people"></i> Customers (<?php echo count($customersWithOrders); ?>)
+                    <?php if ($searchQuery): ?>
+                        <span class="badge bg-info ms-2">Search: "<?php echo htmlspecialchars($searchQuery); ?>"</span>
+                    <?php endif; ?>
+                </h5>
             </div>
             <div class="card-body">
                 <?php if (empty($customersWithOrders)): ?>
@@ -219,7 +285,7 @@ if (!empty($customerIds)) {
                                                 <span class="badge badge-modern bg-danger">Inactive</span>
                                             <?php endif; ?>
                                         </td>
-                                        <td><?php echo formatDate($customer['created_at']); ?></td>
+                                        <td><?php echo formatDate($customer['created_at'] ?? $customer['user_created_at'] ?? ''); ?></td>
                                         <td>
                                             <div class="btn-group btn-group-sm" role="group">
                                                 <button class="btn btn-outline-info" 
@@ -289,7 +355,7 @@ if (!empty($customerIds)) {
                         <div class="col-md-6">
                             <h6>Account Statistics</h6>
                             <p><strong>Total Orders:</strong> ${customer.order_count}</p>
-                            <p><strong>Total Spent:</strong> $${customer.total_spent.toFixed(2)}</p>
+                            <p><strong>Total Spent:</strong> GHS ${customer.total_spent.toFixed(2)}</p>
                         </div>
                         <div class="col-md-6">
                             <h6>Account Status</h6>

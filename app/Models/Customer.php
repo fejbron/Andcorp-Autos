@@ -111,28 +111,48 @@ class Customer {
     }
     
     public function getAll($limit = 1000) {
-        // Cache customers list for 10 minutes (only if no limit specified, meaning full list)
-        if ($limit >= 1000) {
-            return Cache::remember('customers_all', function() {
-                $sql = "SELECT c.*, u.email, u.first_name, u.last_name, u.phone, u.is_active, u.created_at as user_created_at
-                        FROM customers c
-                        JOIN users u ON c.user_id = u.id
-                        ORDER BY c.created_at DESC";
-                
+        try {
+            // Build base query
+            $sql = "SELECT c.*, u.email, u.first_name, u.last_name, u.phone, u.is_active, u.created_at as user_created_at
+                    FROM customers c
+                    JOIN users u ON c.user_id = u.id
+                    ORDER BY c.created_at DESC";
+            
+            // Cache customers list for 10 minutes (only if no limit specified, meaning full list)
+            if ($limit >= 1000) {
+                try {
+                    return Cache::remember('customers_all', function() use ($sql) {
+                        $stmt = $this->db->query($sql);
+                        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+                    }, 600);
+                } catch (Exception $cacheError) {
+                    error_log("Cache error in Customer::getAll(): " . $cacheError->getMessage());
+                    // Fall through to direct query without cache
+                }
+            }
+            
+            // Direct query (no cache or cache failed, or limit specified)
+            if ($limit < 1000 && $limit > 0) {
+                // Use integer limit directly in SQL to avoid parameter binding issues
+                $limitValue = (int)min($limit, 1000);
+                $sql .= " LIMIT " . $limitValue;
                 $stmt = $this->db->query($sql);
-                return $stmt->fetchAll();
-            }, 600);
+            } else {
+                // No limit or limit >= 1000
+                $stmt = $this->db->query($sql);
+            }
+            
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Customer::getAll() PDO error: " . $e->getMessage());
+            error_log("SQL State: " . $e->getCode());
+            error_log("Error Info: " . print_r($e->errorInfo, true));
+            error_log("SQL Query: " . $sql);
+            throw $e;
+        } catch (Exception $e) {
+            error_log("Customer::getAll() error: " . $e->getMessage());
+            error_log("Error class: " . get_class($e));
+            throw $e;
         }
-        
-        $sql = "SELECT c.*, u.email, u.first_name, u.last_name, u.phone, u.is_active, u.created_at as user_created_at
-                FROM customers c
-                JOIN users u ON c.user_id = u.id
-                ORDER BY c.created_at DESC
-                LIMIT :limit";
-        
-        $stmt = $this->db->prepare($sql);
-        $stmt->bindValue(':limit', min($limit, 1000), PDO::PARAM_INT);
-        $stmt->execute();
-        return $stmt->fetchAll();
     }
 }

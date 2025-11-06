@@ -32,15 +32,16 @@ $orders = $stmt->fetchAll();
 // Calculate statistics
 $totalOrders = count($orders);
 // Calculate revenue from verified deposits, not initial deposit_amount
-$revenueStmt = $db->query("
+$revenueSql = "
     SELECT COALESCE(SUM(d.amount), 0) as total_revenue 
     FROM deposits d
     INNER JOIN orders o ON d.order_id = o.id
     WHERE d.status = 'verified' 
     AND o.status != 'Cancelled'
-    AND DATE(o.created_at) BETWEEN :start_date AND :end_date
-");
-$revenueStmt->execute([':start_date' => $startDate, ':end_date' => $endDate]);
+    AND DATE(o.created_at) BETWEEN ? AND ?
+";
+$revenueStmt = $db->prepare($revenueSql);
+$revenueStmt->execute([$startDate, $endDate]);
 $revenueResult = $revenueStmt->fetch();
 $totalRevenue = $revenueResult['total_revenue'] ?? 0;
 $totalCost = array_sum(array_column($orders, 'total_cost'));
