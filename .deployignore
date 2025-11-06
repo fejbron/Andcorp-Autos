@@ -1,0 +1,71 @@
+# Files and directories to exclude from deployment package
+
+# Local development files
+.DS_Store
+Thumbs.db
+*.log
+*.swp
+*.swo
+*~
+
+# IDE and editor files
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Git files
+.git/
+.gitignore
+.gitattributes
+
+# Development/test files
+test_*.php
+debug_*.php
+MAMP_SETUP.md
+QUICKSTART.md
+
+# Node modules (if any)
+node_modules/
+package.json
+package-lock.json
+
+# Composer vendor (if managed separately)
+# vendor/
+
+# Local environment
+.env
+.env.local
+.env.development
+
+# Cache and temporary files
+storage/cache/*
+!storage/cache/.gitkeep
+public/uploads/*
+!public/uploads/.gitkeep
+
+# OS files
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+desktop.ini
+
+# Backup files
+*.bak
+*.backup
+*.old
+*.orig
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Documentation that's only for local dev
+CONTRIBUTING.md
+
