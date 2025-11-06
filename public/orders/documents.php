@@ -59,6 +59,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['document']) && $canU
             if ($validation['valid']) {
                 $uploadDir = __DIR__ . '/../uploads/' . ($documentType === 'car_image' ? 'cars' : 'documents');
                 
+                // Create directory if it doesn't exist
+                if (!is_dir($uploadDir)) {
+                    if (!mkdir($uploadDir, 0755, true)) {
+                        $_SESSION['error'] = 'Failed to create upload directory. Please contact administrator.';
+                        redirect(url('orders/documents.php?id=' . $orderId));
+                        exit;
+                    }
+                }
+                
                 // Generate secure filename
                 $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
                 $secureFilename = bin2hex(random_bytes(16)) . '.' . $extension;
@@ -66,6 +75,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['document']) && $canU
                 $relativePath = 'uploads/' . ($documentType === 'car_image' ? 'cars' : 'documents') . '/' . $secureFilename;
                 
                 if (move_uploaded_file($file['tmp_name'], $uploadPath)) {
+                    // Set proper file permissions
+                    chmod($uploadPath, 0644);
                     // Save to database
                     $stmt = $db->prepare("
                         INSERT INTO order_documents 

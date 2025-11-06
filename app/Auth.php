@@ -80,21 +80,21 @@ class Auth {
     
     public static function requireAuth() {
         if (!self::check()) {
-            redirect('login.php');
+            redirect(url('login.php'));
         }
     }
     
     public static function requireAdmin() {
         self::requireAuth();
         if (!self::isAdmin()) {
-            redirect('dashboard.php');
+            redirect(url('dashboard.php'));
         }
     }
     
     public static function requireStaff() {
         self::requireAuth();
         if (!self::isStaff()) {
-            redirect('dashboard.php');
+            redirect(url('dashboard.php'));
         }
     }
     

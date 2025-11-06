@@ -33,10 +33,14 @@ $customersWithOrders = [];
 
 if (!empty($customerIds)) {
     $placeholders = implode(',', array_fill(0, count($customerIds), '?'));
-    $orderSql = "SELECT customer_id, COUNT(*) as order_count, SUM(deposit_amount) as total_spent 
-                 FROM orders 
-                 WHERE customer_id IN ($placeholders)
-                 GROUP BY customer_id";
+    $orderSql = "SELECT 
+                    o.customer_id, 
+                    COUNT(DISTINCT o.id) as order_count, 
+                    COALESCE(SUM(d.amount), 0) as total_spent 
+                 FROM orders o
+                 LEFT JOIN deposits d ON o.id = d.order_id AND d.status = 'verified'
+                 WHERE o.customer_id IN ($placeholders)
+                 GROUP BY o.customer_id";
     $orderStmt = $db->prepare($orderSql);
     $orderStmt->execute($customerIds);
     $orderStats = $orderStmt->fetchAll();

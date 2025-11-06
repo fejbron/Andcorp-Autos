@@ -14,9 +14,14 @@ $totalOrders = array_sum($statusCounts);
 $totalCustomers = count($customers);
 $activeOrders = count(array_filter($allOrders, fn($o) => !in_array($o['status'], ['Delivered', 'Cancelled'])));
 
-// Calculate total revenue
+// Calculate total revenue from verified deposits (not initial deposit_amount)
 $db = Database::getInstance()->getConnection();
-$revenueStmt = $db->query("SELECT SUM(deposit_amount) as total_revenue FROM orders WHERE status != 'Cancelled'");
+$revenueStmt = $db->query("
+    SELECT COALESCE(SUM(d.amount), 0) as total_revenue 
+    FROM deposits d
+    INNER JOIN orders o ON d.order_id = o.id
+    WHERE d.status = 'verified' AND o.status != 'Cancelled'
+");
 $revenue = $revenueStmt->fetch();
 $totalRevenue = $revenue['total_revenue'] ?? 0;
 

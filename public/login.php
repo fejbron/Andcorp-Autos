@@ -135,15 +135,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                 </div>
             </div>
-            
-            <!-- Demo Credentials -->
-            <div class="card-modern mt-3">
-                <div class="card-body">
-                    <p class="mb-2 small"><strong>Demo Credentials:</strong></p>
-                    <p class="mb-1 small">Admin: admin@andcorp.com / admin123</p>
-                    <p class="mb-0 small">Customer: customer@example.com / customer123</p>
-                </div>
-            </div>
         </div>
     </div>
     

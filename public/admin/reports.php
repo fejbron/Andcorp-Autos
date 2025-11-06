@@ -31,7 +31,18 @@ $orders = $stmt->fetchAll();
 
 // Calculate statistics
 $totalOrders = count($orders);
-$totalRevenue = array_sum(array_column($orders, 'deposit_amount'));
+// Calculate revenue from verified deposits, not initial deposit_amount
+$revenueStmt = $db->query("
+    SELECT COALESCE(SUM(d.amount), 0) as total_revenue 
+    FROM deposits d
+    INNER JOIN orders o ON d.order_id = o.id
+    WHERE d.status = 'verified' 
+    AND o.status != 'Cancelled'
+    AND DATE(o.created_at) BETWEEN :start_date AND :end_date
+");
+$revenueStmt->execute([':start_date' => $startDate, ':end_date' => $endDate]);
+$revenueResult = $revenueStmt->fetch();
+$totalRevenue = $revenueResult['total_revenue'] ?? 0;
 $totalCost = array_sum(array_column($orders, 'total_cost'));
 $totalBalance = array_sum(array_column($orders, 'balance_due'));
 
@@ -58,7 +69,8 @@ foreach ($orders as $order) {
         ];
     }
     $customerOrders[$customerId]['count']++;
-    $customerOrders[$customerId]['total'] += $order['deposit_amount'];
+    // Use total_deposits from order (sum of verified deposits) instead of initial deposit_amount
+    $customerOrders[$customerId]['total'] += $order['total_deposits'] ?? 0;
 }
 usort($customerOrders, fn($a, $b) => $b['total'] <=> $a['total']);
 $topCustomers = array_slice($customerOrders, 0, 5);
@@ -70,9 +82,14 @@ for ($i = 5; $i >= 0; $i--) {
     $monthlyData[$month] = ['count' => 0, 'revenue' => 0];
 }
 
-$monthlySql = "SELECT DATE_FORMAT(created_at, '%Y-%m') as month, COUNT(*) as count, SUM(deposit_amount) as revenue
-               FROM orders
-               WHERE created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+$monthlySql = "SELECT 
+                   DATE_FORMAT(o.created_at, '%Y-%m') as month, 
+                   COUNT(DISTINCT o.id) as count, 
+                   COALESCE(SUM(d.amount), 0) as revenue
+               FROM orders o
+               LEFT JOIN deposits d ON o.id = d.order_id AND d.status = 'verified'
+               WHERE o.created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+                 AND o.status != 'Cancelled'
                GROUP BY month
                ORDER BY month";
 $monthlyStmt = $db->query($monthlySql);
