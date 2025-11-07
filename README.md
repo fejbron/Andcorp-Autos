@@ -609,9 +609,9 @@ Edit `config/database.php`:
 return [
     'host' => getenv('DB_HOST') ?: 'localhost',
     'port' => getenv('DB_PORT') ?: '3306',
-    'database' => getenv('DB_DATABASE') ?: 'andcorp_autos',
-    'username' => getenv('DB_USERNAME') ?: 'root',
-    'password' => getenv('DB_PASSWORD') ?: '',
+    'database' => getenv('DB_DATABASE') ?: 'NAME_OF_DB',
+    'username' => getenv('DB_USERNAME') ?: 'NAME_OF_DB_USER',
+    'password' => getenv('DB_PASSWORD') ?: 'PASSWORD_OF_DB_USER',
     'charset' => 'utf8mb4',
     'collation' => 'utf8mb4_unicode_ci',
 ];
