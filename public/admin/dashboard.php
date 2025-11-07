@@ -14,7 +14,7 @@ $totalOrders = array_sum($statusCounts);
 $totalCustomers = count($customers);
 $activeOrders = count(array_filter($allOrders, fn($o) => !in_array($o['status'], ['Delivered', 'Cancelled'])));
 
-// Calculate total revenue from verified deposits (not initial deposit_amount)
+// Calculate total sales from verified deposits (not initial deposit_amount)
 $db = Database::getInstance()->getConnection();
 $revenueStmt = $db->query("
     SELECT COALESCE(SUM(d.amount), 0) as total_revenue 
@@ -97,7 +97,7 @@ $depositStats = $depositModel->getStats();
                         <i class="bi bi-currency-dollar"></i>
                     </div>
                     <h3><?php echo formatCurrency($totalRevenue); ?></h3>
-                    <p>Total Revenue</p>
+                    <p>Total Sales</p>
                 </div>
             </div>
         </div>

@@ -190,7 +190,7 @@ A comprehensive web application for managing international car purchases from ma
 ### 📊 Reporting & Analytics
 
 - **Admin Reports**:
-  - Total revenue (verified deposits)
+  - Total sales (verified deposits)
   - Active vs completed orders
   - Customer statistics
   - Order status breakdown

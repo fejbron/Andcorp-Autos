@@ -211,7 +211,7 @@ if (!empty($customerIds)) {
                         <i class="bi bi-cash-stack"></i>
                     </div>
                     <h3><?php echo formatCurrency(array_sum(array_column($customersWithOrders, 'total_spent'))); ?></h3>
-                    <p>Total Revenue</p>
+                    <p>Total Sales</p>
                 </div>
             </div>
         </div>
