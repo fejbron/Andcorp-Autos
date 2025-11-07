@@ -40,13 +40,6 @@ class SupportTicket {
                 $this->addReply($ticketId, $data['customer_user_id'], $data['message'], false);
             }
             
-            // Log activity
-            Auth::logActivity(
-                $data['customer_user_id'],
-                'ticket_created',
-                "Created support ticket: {$ticketNumber}"
-            );
-            
             return $ticketId;
         } catch (PDOException $e) {
             error_log("SupportTicket::create() error: " . $e->getMessage());
@@ -268,10 +261,6 @@ class SupportTicket {
             $stmt = $this->db->prepare($sql);
             $result = $stmt->execute($params);
             
-            if ($result && $userId) {
-                Auth::logActivity($userId, 'ticket_updated', "Updated ticket #{$ticketId} status to {$status}");
-            }
-            
             return $result;
         } catch (PDOException $e) {
             error_log("SupportTicket::updateStatus() error: " . $e->getMessage());
@@ -287,10 +276,6 @@ class SupportTicket {
             $sql = "UPDATE support_tickets SET assigned_to = ? WHERE id = ?";
             $stmt = $this->db->prepare($sql);
             $result = $stmt->execute([$staffId, $ticketId]);
-            
-            if ($result) {
-                Auth::logActivity($assignedBy, 'ticket_assigned', "Assigned ticket #{$ticketId} to staff #{$staffId}");
-            }
             
             return $result;
         } catch (PDOException $e) {

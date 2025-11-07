@@ -79,14 +79,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'message' => $message
         ];
         
-        $ticketId = $ticketModel->create($ticketData);
-        
-        if ($ticketId) {
-            setSuccess('Your support ticket has been created successfully. Our team will respond shortly.');
-            clearOld();
-            redirect(url('tickets/view.php?id=' . $ticketId));
-        } else {
-            $errors['general'] = 'Failed to create ticket. Please try again.';
+        try {
+            $ticketId = $ticketModel->create($ticketData);
+            
+            if ($ticketId) {
+                setSuccess('Your support ticket has been created successfully. Our team will respond shortly.');
+                clearOld();
+                redirect(url('tickets/view.php?id=' . $ticketId));
+            } else {
+                error_log("Ticket creation failed - no ticket ID returned");
+                $errors['general'] = 'Failed to create ticket. The support_tickets table may not exist. Please contact support.';
+            }
+        } catch (PDOException $e) {
+            error_log("Ticket creation PDO error: " . $e->getMessage());
+            if (strpos($e->getMessage(), "Table") !== false && strpos($e->getMessage(), "doesn't exist") !== false) {
+                $errors['general'] = 'Database tables not set up. Please ask admin to run the setup script.';
+            } else {
+                $errors['general'] = 'Database error: ' . $e->getMessage();
+            }
+        } catch (Exception $e) {
+            error_log("Ticket creation error: " . $e->getMessage());
+            $errors['general'] = 'Error: ' . $e->getMessage();
         }
     }
     

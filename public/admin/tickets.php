@@ -83,41 +83,65 @@ $title = "Support Tickets Management";
                 <?php endif; ?>
 
                 <!-- Statistics Cards -->
-                <div class="row g-4 mb-4">
-                    <div class="col-md-3">
-                        <div class="stat-card primary animate-in">
-                            <div class="stat-icon">
-                                <i class="bi bi-ticket-perforated"></i>
+                <div class="row g-3 mb-4 animate-in">
+                    <div class="col-lg-3 col-md-6">
+                        <div class="card-modern border-0 h-100" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                            <div class="card-body text-white">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-white-50 mb-1">Total Tickets</h6>
+                                        <h2 class="mb-0 fw-bold"><?php echo $stats['total'] ?? 0; ?></h2>
+                                    </div>
+                                    <div class="fs-1 opacity-50">
+                                        <i class="bi bi-ticket-perforated"></i>
+                                    </div>
+                                </div>
                             </div>
-                            <h3><?php echo $stats['total']; ?></h3>
-                            <p>Total Tickets</p>
                         </div>
                     </div>
-                    <div class="col-md-3">
-                        <div class="stat-card info animate-in">
-                            <div class="stat-icon">
-                                <i class="bi bi-envelope-open"></i>
+                    <div class="col-lg-3 col-md-6">
+                        <div class="card-modern border-0 h-100" style="background: linear-gradient(135deg, #5e72e4 0%, #825ee4 100%);">
+                            <div class="card-body text-white">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-white-50 mb-1">Open</h6>
+                                        <h2 class="mb-0 fw-bold"><?php echo $stats['open_count'] ?? 0; ?></h2>
+                                    </div>
+                                    <div class="fs-1 opacity-50">
+                                        <i class="bi bi-envelope-open"></i>
+                                    </div>
+                                </div>
                             </div>
-                            <h3><?php echo $stats['open_count']; ?></h3>
-                            <p>Open</p>
                         </div>
                     </div>
-                    <div class="col-md-3">
-                        <div class="stat-card warning animate-in">
-                            <div class="stat-icon">
-                                <i class="bi bi-hourglass-split"></i>
+                    <div class="col-lg-3 col-md-6">
+                        <div class="card-modern border-0 h-100" style="background: linear-gradient(135deg, #fb6340 0%, #fbb140 100%);">
+                            <div class="card-body text-white">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-white-50 mb-1">Pending</h6>
+                                        <h2 class="mb-0 fw-bold"><?php echo $stats['pending_count'] ?? 0; ?></h2>
+                                    </div>
+                                    <div class="fs-1 opacity-50">
+                                        <i class="bi bi-hourglass-split"></i>
+                                    </div>
+                                </div>
                             </div>
-                            <h3><?php echo $stats['pending_count']; ?></h3>
-                            <p>Pending</p>
                         </div>
                     </div>
-                    <div class="col-md-3">
-                        <div class="stat-card danger animate-in">
-                            <div class="stat-icon">
-                                <i class="bi bi-exclamation-triangle"></i>
+                    <div class="col-lg-3 col-md-6">
+                        <div class="card-modern border-0 h-100" style="background: linear-gradient(135deg, #f5365c 0%, #f56036 100%);">
+                            <div class="card-body text-white">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-white-50 mb-1">Urgent</h6>
+                                        <h2 class="mb-0 fw-bold"><?php echo $stats['urgent_count'] ?? 0; ?></h2>
+                                    </div>
+                                    <div class="fs-1 opacity-50">
+                                        <i class="bi bi-exclamation-triangle"></i>
+                                    </div>
+                                </div>
                             </div>
-                            <h3><?php echo $stats['urgent_count']; ?></h3>
-                            <p>Urgent</p>
                         </div>
                     </div>
                 </div>
@@ -125,24 +149,20 @@ $title = "Support Tickets Management";
                 <!-- Filters -->
                 <div class="card-modern mb-4 animate-in">
                     <div class="card-body">
-                        <div class="row align-items-end">
-                            <div class="col-md-8">
-                                <form method="GET" action="<?php echo htmlspecialchars($_SERVER['PHP_SELF'] ?? 'tickets.php'); ?>" class="row g-3">
-                                    <div class="col-md-10">
-                                        <input type="text" 
-                                               class="form-control" 
-                                               name="search" 
-                                               placeholder="Search by ticket #, customer name, email, or order #..." 
-                                               value="<?php echo htmlspecialchars($searchQuery); ?>">
-                                    </div>
-                                    <div class="col-md-2">
-                                        <button type="submit" class="btn btn-primary w-100">
-                                            <i class="bi bi-search"></i> Search
-                                        </button>
-                                    </div>
+                        <div class="row g-3 align-items-center">
+                            <div class="col-lg-7">
+                                <form method="GET" action="<?php echo htmlspecialchars($_SERVER['PHP_SELF'] ?? 'tickets.php'); ?>" class="d-flex gap-2">
+                                    <input type="text" 
+                                           class="form-control" 
+                                           name="search" 
+                                           placeholder="Search by ticket #, customer name, email, or order #..." 
+                                           value="<?php echo htmlspecialchars($searchQuery); ?>">
+                                    <button type="submit" class="btn btn-primary flex-shrink-0">
+                                        <i class="bi bi-search"></i> Search
+                                    </button>
                                 </form>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-lg-5">
                                 <div class="btn-group w-100" role="group">
                                     <a href="<?php echo url('admin/tickets.php'); ?>" 
                                        class="btn btn-outline-primary btn-sm <?php echo empty($statusFilter) && empty($searchQuery) ? 'active' : ''; ?>">
