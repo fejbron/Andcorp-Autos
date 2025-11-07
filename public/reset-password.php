@@ -63,6 +63,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $tokenValid) {
         redirect(url('reset-password.php?token=' . $token));
     }
 
+    // Rate limiting - 5 attempts per 15 minutes per IP
+    $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    if (!Security::checkRateLimit("reset_password_{$ip}", 5, 900)) {
+        setErrors(['general' => 'Too many password reset attempts. Please try again in 15 minutes.']);
+        redirect(url('reset-password.php?token=' . $token));
+    }
+
     $password = $_POST['password'] ?? '';
     $passwordConfirm = $_POST['password_confirm'] ?? '';
     $errors = [];
@@ -191,18 +198,41 @@ $title = "Reset Password";
 
                             <div class="mb-3">
                                 <label for="password" class="form-label">New Password</label>
-                                <input type="password" 
-                                       class="form-control <?php echo error('password') ? 'is-invalid' : ''; ?>" 
-                                       id="password" 
-                                       name="password" 
-                                       placeholder="Enter new password (min. 8 characters)"
-                                       minlength="8"
-                                       required>
+                                <div class="input-group">
+                                    <input type="password" 
+                                           class="form-control <?php echo error('password') ? 'is-invalid' : ''; ?>" 
+                                           id="password" 
+                                           name="password" 
+                                           placeholder="Enter new password (min. 8 characters)"
+                                           minlength="8"
+                                           required>
+                                    <button class="btn btn-outline-secondary" type="button" id="togglePassword">
+                                        <i class="bi bi-eye" id="toggleIcon"></i>
+                                    </button>
+                                </div>
                                 <?php if (error('password')): ?>
-                                    <div class="invalid-feedback"><?php echo error('password'); ?></div>
-                                <?php else: ?>
-                                    <div class="form-text">Password must be at least 8 characters long.</div>
+                                    <div class="invalid-feedback d-block"><?php echo error('password'); ?></div>
                                 <?php endif; ?>
+                                
+                                <!-- Password Strength Indicator -->
+                                <div class="mt-2">
+                                    <div class="progress" style="height: 5px;">
+                                        <div class="progress-bar" id="passwordStrength" role="progressbar" style="width: 0%"></div>
+                                    </div>
+                                    <small class="text-muted" id="passwordStrengthText">Password strength: <span id="strengthLabel">None</span></small>
+                                </div>
+                                
+                                <div class="form-text mt-2">
+                                    <small>
+                                        Password must contain:
+                                        <ul class="mb-0 mt-1" style="font-size: 0.875rem;">
+                                            <li id="length" class="text-muted">At least 8 characters</li>
+                                            <li id="uppercase" class="text-muted">One uppercase letter</li>
+                                            <li id="lowercase" class="text-muted">One lowercase letter</li>
+                                            <li id="number" class="text-muted">One number</li>
+                                        </ul>
+                                    </small>
+                                </div>
                             </div>
 
                             <div class="mb-3">
@@ -241,6 +271,93 @@ $title = "Reset Password";
 
     <?php clearErrors(); clearOld(); ?>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Password visibility toggle
+        const togglePassword = document.getElementById('togglePassword');
+        const passwordInput = document.getElementById('password');
+        const toggleIcon = document.getElementById('toggleIcon');
+
+        if (togglePassword) {
+            togglePassword.addEventListener('click', function() {
+                const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                passwordInput.setAttribute('type', type);
+                toggleIcon.classList.toggle('bi-eye');
+                toggleIcon.classList.toggle('bi-eye-slash');
+            });
+        }
+
+        // Password strength indicator
+        const password = document.getElementById('password');
+        const strengthBar = document.getElementById('passwordStrength');
+        const strengthLabel = document.getElementById('strengthLabel');
+        const lengthCheck = document.getElementById('length');
+        const uppercaseCheck = document.getElementById('uppercase');
+        const lowercaseCheck = document.getElementById('lowercase');
+        const numberCheck = document.getElementById('number');
+
+        if (password) {
+            password.addEventListener('input', function() {
+                const value = this.value;
+                let strength = 0;
+                let checks = {
+                    length: value.length >= 8,
+                    uppercase: /[A-Z]/.test(value),
+                    lowercase: /[a-z]/.test(value),
+                    number: /[0-9]/.test(value),
+                    special: /[^A-Za-z0-9]/.test(value)
+                };
+
+                // Update check marks
+                updateCheck(lengthCheck, checks.length);
+                updateCheck(uppercaseCheck, checks.uppercase);
+                updateCheck(lowercaseCheck, checks.lowercase);
+                updateCheck(numberCheck, checks.number);
+
+                // Calculate strength
+                if (checks.length) strength += 25;
+                if (checks.uppercase) strength += 20;
+                if (checks.lowercase) strength += 20;
+                if (checks.number) strength += 20;
+                if (checks.special) strength += 15;
+
+                // Update progress bar
+                strengthBar.style.width = strength + '%';
+                
+                // Update color and label
+                if (strength === 0) {
+                    strengthBar.className = 'progress-bar';
+                    strengthLabel.textContent = 'None';
+                    strengthLabel.className = 'text-muted';
+                } else if (strength < 40) {
+                    strengthBar.className = 'progress-bar bg-danger';
+                    strengthLabel.textContent = 'Weak';
+                    strengthLabel.className = 'text-danger fw-bold';
+                } else if (strength < 70) {
+                    strengthBar.className = 'progress-bar bg-warning';
+                    strengthLabel.textContent = 'Fair';
+                    strengthLabel.className = 'text-warning fw-bold';
+                } else if (strength < 90) {
+                    strengthBar.className = 'progress-bar bg-info';
+                    strengthLabel.textContent = 'Good';
+                    strengthLabel.className = 'text-info fw-bold';
+                } else {
+                    strengthBar.className = 'progress-bar bg-success';
+                    strengthLabel.textContent = 'Strong';
+                    strengthLabel.className = 'text-success fw-bold';
+                }
+            });
+        }
+
+        function updateCheck(element, passed) {
+            if (passed) {
+                element.innerHTML = element.innerHTML.replace(/^.*?(?=<|$)/, '✓ ' + element.textContent.replace('✓ ', '').replace('✗ ', ''));
+                element.className = 'text-success';
+            } else {
+                element.innerHTML = element.innerHTML.replace(/^.*?(?=<|$)/, '✗ ' + element.textContent.replace('✓ ', '').replace('✗ ', ''));
+                element.className = 'text-muted';
+            }
+        }
+    </script>
 </body>
 </html>
 

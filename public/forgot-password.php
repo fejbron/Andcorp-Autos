@@ -15,6 +15,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect(url('forgot-password.php'));
     }
 
+    // Rate limiting - 3 attempts per 15 minutes per IP
+    $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    if (!Security::checkRateLimit("forgot_password_{$ip}", 3, 900)) {
+        setErrors(['general' => 'Too many password reset requests. Please try again in 15 minutes.']);
+        redirect(url('forgot-password.php'));
+    }
+
     $email = Security::sanitizeEmail($_POST['email'] ?? '');
     
     if (empty($email)) {
