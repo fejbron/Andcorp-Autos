@@ -338,7 +338,7 @@ A comprehensive web application for managing international car purchases from ma
 ### Default Credentials (After Seeding)
 
 **Admin Account**
-- Email: `admin@andcorpautos.com`
+- Email: `admin@example.com`
 - Password: `admin123` (change immediately!)
 
 **Test Customer Account**
