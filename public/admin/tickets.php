@@ -83,65 +83,41 @@ $title = "Support Tickets Management";
                 <?php endif; ?>
 
                 <!-- Statistics Cards -->
-                <div class="row g-3 mb-4 animate-in">
-                    <div class="col-lg-3 col-md-6">
-                        <div class="card-modern border-0 h-100" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                            <div class="card-body text-white">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="text-white-50 mb-1">Total Tickets</h6>
-                                        <h2 class="mb-0 fw-bold"><?php echo $stats['total'] ?? 0; ?></h2>
-                                    </div>
-                                    <div class="fs-1 opacity-50">
-                                        <i class="bi bi-ticket-perforated"></i>
-                                    </div>
-                                </div>
+                <div class="row g-4 mb-4">
+                    <div class="col-md-3">
+                        <div class="stat-card primary animate-in">
+                            <div class="stat-icon">
+                                <i class="bi bi-ticket-perforated"></i>
                             </div>
+                            <h3><?php echo $stats['total'] ?? 0; ?></h3>
+                            <p>Total Tickets</p>
                         </div>
                     </div>
-                    <div class="col-lg-3 col-md-6">
-                        <div class="card-modern border-0 h-100" style="background: linear-gradient(135deg, #5e72e4 0%, #825ee4 100%);">
-                            <div class="card-body text-white">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="text-white-50 mb-1">Open</h6>
-                                        <h2 class="mb-0 fw-bold"><?php echo $stats['open_count'] ?? 0; ?></h2>
-                                    </div>
-                                    <div class="fs-1 opacity-50">
-                                        <i class="bi bi-envelope-open"></i>
-                                    </div>
-                                </div>
+                    <div class="col-md-3">
+                        <div class="stat-card info animate-in">
+                            <div class="stat-icon">
+                                <i class="bi bi-envelope-open"></i>
                             </div>
+                            <h3><?php echo $stats['open_count'] ?? 0; ?></h3>
+                            <p>Open Tickets</p>
                         </div>
                     </div>
-                    <div class="col-lg-3 col-md-6">
-                        <div class="card-modern border-0 h-100" style="background: linear-gradient(135deg, #fb6340 0%, #fbb140 100%);">
-                            <div class="card-body text-white">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="text-white-50 mb-1">Pending</h6>
-                                        <h2 class="mb-0 fw-bold"><?php echo $stats['pending_count'] ?? 0; ?></h2>
-                                    </div>
-                                    <div class="fs-1 opacity-50">
-                                        <i class="bi bi-hourglass-split"></i>
-                                    </div>
-                                </div>
+                    <div class="col-md-3">
+                        <div class="stat-card warning animate-in">
+                            <div class="stat-icon">
+                                <i class="bi bi-hourglass-split"></i>
                             </div>
+                            <h3><?php echo $stats['pending_count'] ?? 0; ?></h3>
+                            <p>Pending Response</p>
                         </div>
                     </div>
-                    <div class="col-lg-3 col-md-6">
-                        <div class="card-modern border-0 h-100" style="background: linear-gradient(135deg, #f5365c 0%, #f56036 100%);">
-                            <div class="card-body text-white">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="text-white-50 mb-1">Urgent</h6>
-                                        <h2 class="mb-0 fw-bold"><?php echo $stats['urgent_count'] ?? 0; ?></h2>
-                                    </div>
-                                    <div class="fs-1 opacity-50">
-                                        <i class="bi bi-exclamation-triangle"></i>
-                                    </div>
-                                </div>
+                    <div class="col-md-3">
+                        <div class="stat-card danger animate-in">
+                            <div class="stat-icon">
+                                <i class="bi bi-exclamation-triangle"></i>
                             </div>
+                            <h3><?php echo $stats['urgent_count'] ?? 0; ?></h3>
+                            <p>Urgent Priority</p>
                         </div>
                     </div>
                 </div>
