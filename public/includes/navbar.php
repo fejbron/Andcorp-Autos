@@ -19,6 +19,9 @@
                         <a class="nav-link" href="<?php echo url('orders.php'); ?>"><i class="bi bi-box-seam"></i> My Orders</a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link" href="<?php echo url('tickets.php'); ?>"><i class="bi bi-life-preserver"></i> Support</a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link" href="<?php echo url('gallery.php'); ?>"><i class="bi bi-images"></i> Gallery</a>
                     </li>
                 <?php endif; ?>
@@ -35,6 +38,9 @@
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="<?php echo url('admin/deposits.php'); ?>"><i class="bi bi-wallet2"></i> Deposits</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="<?php echo url('admin/tickets.php'); ?>"><i class="bi bi-life-preserver"></i> Support Tickets</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="<?php echo url('gallery.php'); ?>"><i class="bi bi-images"></i> Gallery</a>
