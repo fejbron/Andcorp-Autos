@@ -222,10 +222,172 @@ $title = "Order Documents - " . $order['order_number'];
         .document-thumbnail {
             height: 150px;
             object-fit: cover;
+            cursor: pointer;
         }
         .pdf-icon {
             font-size: 5rem;
             color: var(--primary-color);
+        }
+        
+        /* Lightbox Styles */
+        .lightbox {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 9999;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        .lightbox.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .lightbox-content {
+            position: relative;
+            max-width: 90%;
+            max-height: 85vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .lightbox-image {
+            max-width: 100%;
+            max-height: 85vh;
+            object-fit: contain;
+            border-radius: 8px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        }
+        
+        .lightbox-info {
+            position: absolute;
+            bottom: -100px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            color: white;
+            padding: 15px;
+        }
+        
+        .lightbox-info h5 {
+            margin: 0 0 10px 0;
+            font-size: 1.3rem;
+        }
+        
+        .lightbox-info p {
+            margin: 5px 0;
+            opacity: 0.9;
+        }
+        
+        .lightbox-close {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            color: white;
+            font-size: 40px;
+            font-weight: bold;
+            cursor: pointer;
+            z-index: 10000;
+            background: rgba(0, 0, 0, 0.5);
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.3s ease;
+        }
+        
+        .lightbox-close:hover {
+            background: rgba(255, 0, 0, 0.7);
+        }
+        
+        .lightbox-nav {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            color: white;
+            font-size: 60px;
+            cursor: pointer;
+            user-select: none;
+            background: rgba(0, 0, 0, 0.5);
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.3s ease;
+            z-index: 10000;
+        }
+        
+        .lightbox-nav:hover {
+            background: rgba(0, 0, 0, 0.8);
+        }
+        
+        .lightbox-nav.disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+        
+        .lightbox-prev {
+            left: 30px;
+        }
+        
+        .lightbox-next {
+            right: 30px;
+        }
+        
+        .lightbox-counter {
+            position: absolute;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-size: 18px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px 20px;
+            border-radius: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .lightbox-nav {
+                font-size: 40px;
+                width: 50px;
+                height: 50px;
+            }
+            
+            .lightbox-prev {
+                left: 10px;
+            }
+            
+            .lightbox-next {
+                right: 10px;
+            }
+            
+            .lightbox-close {
+                top: 10px;
+                right: 10px;
+                font-size: 30px;
+                width: 40px;
+                height: 40px;
+            }
+            
+            .lightbox-info {
+                bottom: -120px;
+            }
         }
     </style>
 </head>
@@ -361,8 +523,13 @@ $title = "Order Documents - " . $order['order_number'];
                                                 <i class="bi bi-file-pdf pdf-icon"></i>
                                             <?php else: ?>
                                                 <img src="<?php echo url($doc['file_path']); ?>" 
-                                                     class="img-fluid document-thumbnail mb-2" 
-                                                     alt="Document">
+                                                     class="img-fluid document-thumbnail mb-2 lightbox-trigger" 
+                                                     alt="Document"
+                                                     data-filename="<?php echo htmlspecialchars($doc['file_name']); ?>"
+                                                     data-filesize="<?php echo number_format($doc['file_size'] / 1024, 2); ?>"
+                                                     data-date="<?php echo date('M d, Y', strtotime($doc['uploaded_at'])); ?>"
+                                                     data-type="<?php echo htmlspecialchars($type); ?>"
+                                                     onclick="openLightbox(this)">
                                             <?php endif; ?>
                                             
                                             <p class="small mb-1">
@@ -375,11 +542,19 @@ $title = "Order Documents - " . $order['order_number'];
                                             </p>
                                             
                                             <div class="btn-group btn-group-sm" role="group">
-                                                <a href="<?php echo url($doc['file_path']); ?>" 
-                                                   class="btn btn-outline-primary" 
-                                                   target="_blank">
-                                                    <i class="bi bi-eye"></i> View
-                                                </a>
+                                                <?php if ($isPdf): ?>
+                                                    <a href="<?php echo url($doc['file_path']); ?>" 
+                                                       class="btn btn-outline-primary" 
+                                                       target="_blank">
+                                                        <i class="bi bi-eye"></i> View
+                                                    </a>
+                                                <?php else: ?>
+                                                    <button type="button" 
+                                                            class="btn btn-outline-primary"
+                                                            onclick="openLightbox(document.querySelector('img[data-filename=\'<?php echo htmlspecialchars(addslashes($doc['file_name'])); ?>\']'))">
+                                                        <i class="bi bi-eye"></i> View
+                                                    </button>
+                                                <?php endif; ?>
                                                 <?php if ($canUpload): ?>
                                                     <a href="<?php echo url('orders/documents.php?id=' . $orderId . '&delete=' . $doc['id']); ?>" 
                                                        class="btn btn-outline-danger"
@@ -407,7 +582,137 @@ $title = "Order Documents - " . $order['order_number'];
 
     <?php include __DIR__ . '/../includes/footer.php'; ?>
 
+    <!-- Lightbox -->
+    <div id="lightbox" class="lightbox">
+        <span class="lightbox-close" onclick="closeLightbox()">&times;</span>
+        <div class="lightbox-counter" id="lightboxCounter"></div>
+        <span class="lightbox-nav lightbox-prev" id="lightboxPrev" onclick="changeImage(-1)">
+            <i class="bi bi-chevron-left"></i>
+        </span>
+        <div class="lightbox-content">
+            <img id="lightboxImage" class="lightbox-image" src="" alt="">
+            <div class="lightbox-info">
+                <h5 id="lightboxFilename"></h5>
+                <p id="lightboxType"></p>
+                <p id="lightboxDetails"></p>
+            </div>
+        </div>
+        <span class="lightbox-nav lightbox-next" id="lightboxNext" onclick="changeImage(1)">
+            <i class="bi bi-chevron-right"></i>
+        </span>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let currentImageIndex = 0;
+        let lightboxImages = [];
+
+        // Initialize lightbox images array on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            lightboxImages = Array.from(document.querySelectorAll('.lightbox-trigger'));
+        });
+
+        function openLightbox(element) {
+            const lightbox = document.getElementById('lightbox');
+            currentImageIndex = lightboxImages.indexOf(element);
+            
+            updateLightboxImage();
+            lightbox.classList.add('active');
+            document.body.style.overflow = 'hidden'; // Prevent scrolling
+        }
+
+        function closeLightbox() {
+            const lightbox = document.getElementById('lightbox');
+            lightbox.classList.remove('active');
+            document.body.style.overflow = ''; // Restore scrolling
+        }
+
+        function changeImage(direction) {
+            if (lightboxImages.length === 0) return;
+            
+            currentImageIndex += direction;
+            
+            // Loop around if at the end or beginning
+            if (currentImageIndex >= lightboxImages.length) {
+                currentImageIndex = 0;
+            } else if (currentImageIndex < 0) {
+                currentImageIndex = lightboxImages.length - 1;
+            }
+            
+            updateLightboxImage();
+        }
+
+        function updateLightboxImage() {
+            if (lightboxImages.length === 0) return;
+            
+            const currentImage = lightboxImages[currentImageIndex];
+            const lightboxImage = document.getElementById('lightboxImage');
+            const lightboxFilename = document.getElementById('lightboxFilename');
+            const lightboxType = document.getElementById('lightboxType');
+            const lightboxDetails = document.getElementById('lightboxDetails');
+            const lightboxCounter = document.getElementById('lightboxCounter');
+            const prevBtn = document.getElementById('lightboxPrev');
+            const nextBtn = document.getElementById('lightboxNext');
+            
+            // Update image and info
+            lightboxImage.src = currentImage.src;
+            lightboxImage.alt = currentImage.alt;
+            lightboxFilename.textContent = currentImage.dataset.filename;
+            
+            // Format document type nicely
+            const type = currentImage.dataset.type;
+            const typeLabel = {
+                'car_image': 'Car Image',
+                'title': 'Car Title',
+                'bill_of_lading': 'Bill of Lading',
+                'bill_of_entry': 'Bill of Entry / Duty',
+                'evidence_of_delivery': 'Evidence of Delivery'
+            }[type] || type;
+            
+            lightboxType.innerHTML = '<i class="bi bi-tag"></i> ' + typeLabel;
+            lightboxDetails.innerHTML = '<i class="bi bi-info-circle"></i> ' + 
+                currentImage.dataset.filesize + ' KB • ' + currentImage.dataset.date;
+            
+            // Update counter
+            if (lightboxImages.length > 1) {
+                lightboxCounter.textContent = (currentImageIndex + 1) + ' / ' + lightboxImages.length;
+                prevBtn.style.display = 'flex';
+                nextBtn.style.display = 'flex';
+            } else {
+                lightboxCounter.textContent = '1 / 1';
+                prevBtn.style.display = 'none';
+                nextBtn.style.display = 'none';
+            }
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', function(event) {
+            const lightbox = document.getElementById('lightbox');
+            if (!lightbox.classList.contains('active')) return;
+            
+            if (event.key === 'ArrowLeft') {
+                changeImage(-1);
+            } else if (event.key === 'ArrowRight') {
+                changeImage(1);
+            } else if (event.key === 'Escape') {
+                closeLightbox();
+            }
+        });
+
+        // Close lightbox when clicking outside the image
+        document.getElementById('lightbox').addEventListener('click', function(event) {
+            if (event.target === this) {
+                closeLightbox();
+            }
+        });
+
+        // Prevent image drag
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('lightboxImage').addEventListener('dragstart', function(e) {
+                e.preventDefault();
+            });
+        });
+    </script>
 </body>
 </html>
 
