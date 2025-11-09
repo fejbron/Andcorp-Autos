@@ -5,25 +5,33 @@ Auth::requireStaff();
 $orderModel = new Order();
 $customerModel = new Customer();
 
+// Pagination for recent orders
+$page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+$perPage = 10;
+$offset = ($page - 1) * $perPage;
+
 // Get statistics
 $statusCounts = $orderModel->getStatusCounts();
-$allOrders = $orderModel->getAll(null, 10, 0);
+$allOrders = $orderModel->getAll(null, $perPage, $offset);
 $customers = $customerModel->getAll();
 
-$totalOrders = array_sum($statusCounts);
+// Get total orders count for pagination
+$totalOrdersCount = array_sum($statusCounts);
+$totalPages = ceil($totalOrdersCount / $perPage);
+
+$totalOrders = $totalOrdersCount; // Use the same value
 $totalCustomers = count($customers);
 $activeOrders = count(array_filter($allOrders, fn($o) => !in_array($o['status'], ['Delivered', 'Cancelled'])));
 
-// Calculate total sales from verified deposits (not initial deposit_amount)
+// Calculate total value from order costs (total_cost field)
 $db = Database::getInstance()->getConnection();
-$revenueStmt = $db->query("
-    SELECT COALESCE(SUM(d.amount), 0) as total_revenue 
-    FROM deposits d
-    INNER JOIN orders o ON d.order_id = o.id
-    WHERE d.status = 'verified' AND o.status != 'Cancelled'
+$totalValueStmt = $db->query("
+    SELECT COALESCE(SUM(total_cost), 0) as total_value 
+    FROM orders
+    WHERE status != 'Cancelled'
 ");
-$revenue = $revenueStmt->fetch();
-$totalRevenue = $revenue['total_revenue'] ?? 0;
+$totalValueResult = $totalValueStmt->fetch();
+$totalValue = $totalValueResult['total_value'] ?? 0;
 
 // Get deposit statistics
 $depositModel = new Deposit();
@@ -103,10 +111,10 @@ $pendingBalance = $pendingBalanceResult['pending_balance'] ?? 0;
             <div class="col-md-3">
                 <div class="stat-card success animate-in">
                     <div class="stat-icon">
-                        <i class="bi bi-cash-stack"></i>
+                        <i class="bi bi-currency-dollar"></i>
                     </div>
-                    <h3><?php echo formatCurrency($totalRevenue); ?></h3>
-                    <p>Total Revenue</p>
+                    <h3><?php echo formatCurrency($totalValue); ?></h3>
+                    <p>Total Value</p>
                 </div>
             </div>
         </div>
@@ -238,6 +246,71 @@ $pendingBalance = $pendingBalanceResult['pending_balance'] ?? 0;
                                 </tbody>
                             </table>
                         </div>
+                        
+                        <!-- Pagination -->
+                        <?php if ($totalPages > 1): ?>
+                            <div class="card-footer">
+                                <nav aria-label="Orders pagination">
+                                    <ul class="pagination pagination-sm justify-content-center mb-0">
+                                        <!-- Previous Button -->
+                                        <li class="page-item <?php echo $page <= 1 ? 'disabled' : ''; ?>">
+                                            <a class="page-link" href="<?php echo url('admin/dashboard.php?page=' . ($page - 1)); ?>" aria-label="Previous">
+                                                <span aria-hidden="true">&laquo;</span>
+                                            </a>
+                                        </li>
+                                        
+                                        <?php
+                                        // Show page numbers with ellipsis for large page counts
+                                        $startPage = max(1, $page - 2);
+                                        $endPage = min($totalPages, $page + 2);
+                                        
+                                        // Show first page
+                                        if ($startPage > 1): ?>
+                                            <li class="page-item">
+                                                <a class="page-link" href="<?php echo url('admin/dashboard.php?page=1'); ?>">1</a>
+                                            </li>
+                                            <?php if ($startPage > 2): ?>
+                                                <li class="page-item disabled"><span class="page-link">...</span></li>
+                                            <?php endif;
+                                        endif;
+                                        
+                                        // Show page numbers
+                                        for ($i = $startPage; $i <= $endPage; $i++): ?>
+                                            <li class="page-item <?php echo $i === $page ? 'active' : ''; ?>">
+                                                <a class="page-link" href="<?php echo url('admin/dashboard.php?page=' . $i); ?>">
+                                                    <?php echo $i; ?>
+                                                </a>
+                                            </li>
+                                        <?php endfor;
+                                        
+                                        // Show last page
+                                        if ($endPage < $totalPages): ?>
+                                            <?php if ($endPage < $totalPages - 1): ?>
+                                                <li class="page-item disabled"><span class="page-link">...</span></li>
+                                            <?php endif; ?>
+                                            <li class="page-item">
+                                                <a class="page-link" href="<?php echo url('admin/dashboard.php?page=' . $totalPages); ?>">
+                                                    <?php echo $totalPages; ?>
+                                                </a>
+                                            </li>
+                                        <?php endif; ?>
+                                        
+                                        <!-- Next Button -->
+                                        <li class="page-item <?php echo $page >= $totalPages ? 'disabled' : ''; ?>">
+                                            <a class="page-link" href="<?php echo url('admin/dashboard.php?page=' . ($page + 1)); ?>" aria-label="Next">
+                                                <span aria-hidden="true">&raquo;</span>
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </nav>
+                                <div class="text-center mt-2">
+                                    <small class="text-muted">
+                                        Page <?php echo $page; ?> of <?php echo $totalPages; ?> 
+                                        (<?php echo $totalOrdersCount; ?> total orders)
+                                    </small>
+                                </div>
+                            </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
