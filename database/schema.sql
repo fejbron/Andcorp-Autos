@@ -40,6 +40,9 @@ CREATE TABLE IF NOT EXISTS orders (
     total_cost DECIMAL(10, 2) DEFAULT 0.00,
     deposit_amount DECIMAL(10, 2) DEFAULT 0.00,
     balance_due DECIMAL(10, 2) DEFAULT 0.00,
+    estimated_arrival_ghana DATE,
+    estimated_fixing_completion DATE,
+    estimated_pickup_delivery DATE,
     discount_type ENUM('none', 'fixed', 'percentage') DEFAULT 'none',
     discount_value DECIMAL(10, 2) DEFAULT 0.00,
     subtotal DECIMAL(10, 2) DEFAULT 0.00,
@@ -51,7 +54,9 @@ CREATE TABLE IF NOT EXISTS orders (
     INDEX idx_customer (customer_id),
     INDEX idx_status (status),
     INDEX idx_order_number (order_number),
-    INDEX idx_discount_type (discount_type)
+    INDEX idx_discount_type (discount_type),
+    INDEX idx_estimated_arrival (estimated_arrival_ghana),
+    INDEX idx_estimated_pickup (estimated_pickup_delivery)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Vehicles table
@@ -264,4 +269,18 @@ CREATE TABLE IF NOT EXISTS activity_logs (
     INDEX idx_user (user_id),
     INDEX idx_order (order_id),
     INDEX idx_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Order status history table
+CREATE TABLE IF NOT EXISTS order_status_history (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    order_id INT NOT NULL,
+    status VARCHAR(50) NOT NULL,
+    changed_by INT,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+    FOREIGN KEY (changed_by) REFERENCES users(id) ON DELETE SET NULL,
+    INDEX idx_order_status (order_id, created_at DESC),
+    INDEX idx_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

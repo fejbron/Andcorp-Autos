@@ -107,6 +107,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'duty_cost' => $dutyCost,
                 'clearing_cost' => $clearingCost,
                 'fixing_cost' => $fixingCost,
+                'estimated_arrival_ghana' => !empty($_POST['estimated_arrival_ghana']) ? $_POST['estimated_arrival_ghana'] : null,
+                'estimated_fixing_completion' => !empty($_POST['estimated_fixing_completion']) ? $_POST['estimated_fixing_completion'] : null,
+                'estimated_pickup_delivery' => !empty($_POST['estimated_pickup_delivery']) ? $_POST['estimated_pickup_delivery'] : null,
                 'total_usd' => $subtotal // Store subtotal as total_usd for backward compatibility
             ]);
             
@@ -133,7 +136,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Send notification if status changed
             $newStatus = Security::sanitizeStatus($_POST['status'] ?? $order['status']);
             if ($newStatus !== $order['status']) {
-                // Log status change specifically
+                // Record status change in history table
+                $db = Database::getInstance()->getConnection();
+                $statusHistoryStmt = $db->prepare("
+                    INSERT INTO order_status_history (order_id, status, changed_by, notes) 
+                    VALUES (:order_id, :status, :changed_by, :notes)
+                ");
+                $statusHistoryStmt->execute([
+                    ':order_id' => $orderId,
+                    ':status' => $newStatus,
+                    ':changed_by' => Auth::userId(),
+                    ':notes' => "Status changed from '{$order['status']}' to '{$newStatus}'"
+                ]);
+                
+                // Log status change in activity log
                 Auth::logOrderActivity(Auth::userId(), $orderId, 'status_changed', 
                     "Order status changed from '{$order['status']}' to '{$newStatus}'");
                 
@@ -244,6 +260,48 @@ $activities = $activityStmt->fetchAll();
                                             <option value="Cancelled" <?php echo $order['status'] === 'Cancelled' ? 'selected' : ''; ?>>Cancelled</option>
                                         </select>
                                         <div class="form-text">Changing status will send notification to customer</div>
+                                    </div>
+
+                                    <!-- Estimated Dates -->
+                                    <h6 class="mt-4 mb-3"><i class="bi bi-calendar-event"></i> Estimated Dates</h6>
+                                    <p class="text-muted small mb-3">Provide estimated timeline for customer transparency</p>
+                                    <div class="row">
+                                        <div class="col-md-4 mb-3">
+                                            <label for="estimated_arrival_ghana" class="form-label">
+                                                Estimated Arrival to Ghana
+                                                <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip" title="Expected arrival date at Ghana port"></i>
+                                            </label>
+                                            <input type="date" class="form-control" id="estimated_arrival_ghana" 
+                                                   name="estimated_arrival_ghana" 
+                                                   value="<?php echo $order['estimated_arrival_ghana'] ?? ''; ?>">
+                                            <small class="form-text text-muted">When vehicle expected to arrive in Ghana</small>
+                                        </div>
+
+                                        <div class="col-md-4 mb-3">
+                                            <label for="estimated_fixing_completion" class="form-label">
+                                                Estimated Fixing Completion
+                                                <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip" title="Expected completion of repairs/preparation"></i>
+                                            </label>
+                                            <input type="date" class="form-control" id="estimated_fixing_completion" 
+                                                   name="estimated_fixing_completion" 
+                                                   value="<?php echo $order['estimated_fixing_completion'] ?? ''; ?>">
+                                            <small class="form-text text-muted">When repairs/preparation will be done</small>
+                                        </div>
+
+                                        <div class="col-md-4 mb-3">
+                                            <label for="estimated_pickup_delivery" class="form-label">
+                                                Estimated Pickup/Delivery Date
+                                                <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip" title="Expected date for customer pickup or delivery"></i>
+                                            </label>
+                                            <input type="date" class="form-control" id="estimated_pickup_delivery" 
+                                                   name="estimated_pickup_delivery" 
+                                                   value="<?php echo $order['estimated_pickup_delivery'] ?? ''; ?>">
+                                            <small class="form-text text-muted">When customer can pick up or receive delivery</small>
+                                        </div>
+                                    </div>
+                                    <div class="alert alert-info">
+                                        <i class="bi bi-info-circle"></i> 
+                                        <strong>Note:</strong> These dates are estimates and will be visible to the customer. Update them as the order progresses for better transparency.
                                     </div>
 
                                     <!-- Financial -->

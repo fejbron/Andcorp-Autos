@@ -101,6 +101,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'purchase_date' => !empty($_POST['purchase_date']) ? $_POST['purchase_date'] : null
             ]);
             
+            // Record initial status in history table
+            $statusHistoryStmt = $db->prepare("
+                INSERT INTO order_status_history (order_id, status, changed_by, notes) 
+                VALUES (:order_id, :status, :changed_by, :notes)
+            ");
+            $statusHistoryStmt->execute([
+                ':order_id' => $orderId,
+                ':status' => Security::sanitizeStatus($_POST['status'] ?? 'Pending'),
+                ':changed_by' => Auth::userId(),
+                ':notes' => 'Order created'
+            ]);
+            
             // Log activity
             Auth::logOrderActivity(Auth::userId(), $orderId, 'order_created', 'Order created by staff: ' . $orderNumber);
             

@@ -188,7 +188,11 @@ class Order {
         // Whitelist allowed fields for security
         $allowedFields = [
             'status', 'total_cost', 'deposit_amount', 'balance_due', 
-            'currency', 'notes', 'order_number'
+            'currency', 'notes', 'order_number',
+            'subtotal', 'discount_type', 'discount_value', 'total_deposits',
+            'car_cost', 'transportation_cost', 'duty_cost', 'clearing_cost', 'fixing_cost',
+            'estimated_arrival_ghana', 'estimated_fixing_completion', 'estimated_pickup_delivery',
+            'total_usd'
         ];
         
         $fields = [];
@@ -202,7 +206,7 @@ class Order {
             if ($key === 'status') {
                 $fields[] = "status = :status";
                 $params[':status'] = Security::sanitizeStatus($value);
-            } elseif ($key === 'total_cost' || $key === 'deposit_amount' || $key === 'balance_due') {
+            } elseif (in_array($key, ['total_cost', 'deposit_amount', 'balance_due', 'subtotal', 'discount_value', 'total_deposits', 'car_cost', 'transportation_cost', 'duty_cost', 'clearing_cost', 'fixing_cost', 'total_usd'], true)) {
                 $fields[] = "$key = :$key";
                 $params[":$key"] = Security::sanitizeFloat($value, 0);
             } elseif ($key === 'currency') {
@@ -215,6 +219,17 @@ class Order {
             } elseif ($key === 'order_number') {
                 $fields[] = "order_number = :order_number";
                 $params[':order_number'] = Security::sanitizeString($value, 50);
+            } elseif ($key === 'discount_type') {
+                $allowedDiscounts = ['none', 'fixed', 'percentage'];
+                $discountType = strtolower($value ?? 'none');
+                if (!in_array($discountType, $allowedDiscounts, true)) {
+                    $discountType = 'none';
+                }
+                $fields[] = "discount_type = :discount_type";
+                $params[':discount_type'] = $discountType;
+            } elseif (in_array($key, ['estimated_arrival_ghana', 'estimated_fixing_completion', 'estimated_pickup_delivery'], true)) {
+                $fields[] = "$key = :$key";
+                $params[":$key"] = !empty($value) ? Security::sanitizeString($value, 10) : null;
             }
         }
         

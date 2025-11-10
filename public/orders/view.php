@@ -60,10 +60,14 @@ $customsStmt = $db->prepare("SELECT * FROM customs_clearing WHERE order_id = :or
 $customsStmt->execute([':order_id' => $orderId]);
 $customs = $customsStmt->fetch();
 
-// Get activity logs for status changes
-$activityStmt = $db->prepare("SELECT * FROM activity_logs WHERE order_id = :order_id ORDER BY created_at ASC");
-$activityStmt->execute([':order_id' => $orderId]);
-$activityLogs = $activityStmt->fetchAll();
+// Get status history for tracking timeline
+$statusHistoryStmt = $db->prepare("
+    SELECT * FROM order_status_history 
+    WHERE order_id = :order_id 
+    ORDER BY created_at ASC
+");
+$statusHistoryStmt->execute([':order_id' => $orderId]);
+$statusHistory = $statusHistoryStmt->fetchAll();
 
 // Inspection reports
 $inspectionModel = new InspectionReport();
@@ -170,35 +174,70 @@ $payments = $paymentsStmt->fetchAll();
                         'Delivered' => 'Delivered'
                     ];
                     
-                    // Build map of status to timestamp from activity logs
+                    // Build map of status to timestamp from status history
                     $statusTimestamps = [];
-                    $statusTimestamps['Pending'] = $order['created_at']; // Order creation date
                     
-                    foreach ($activityLogs as $log) {
-                        // Check if this log is about a status change
-                        if (strpos($log['description'], 'status changed to') !== false || 
-                            strpos($log['description'], 'Status updated to') !== false) {
-                            // Extract status from description
-                            foreach ($statuses as $status) {
-                                if (stripos($log['description'], $status) !== false) {
-                                    // Only record the first time each status was reached
-                                    if (!isset($statusTimestamps[$status])) {
-                                        $statusTimestamps[$status] = $log['created_at'];
-                                    }
-                                }
-                            }
-                        } elseif ($log['action'] === 'order_created') {
-                            $statusTimestamps['Pending'] = $log['created_at'];
+                    foreach ($statusHistory as $history) {
+                        // Only record the first time each status was reached
+                        if (!isset($statusTimestamps[$history['status']])) {
+                            $statusTimestamps[$history['status']] = $history['created_at'];
                         }
                     }
                     
                     $currentIndex = array_search($order['status'], $statuses);
+                    
+                    $estimatedMap = [
+                        'Arrived in Ghana' => [
+                            'field' => 'estimated_arrival_ghana',
+                            'label' => 'Estimated arrival to Ghana',
+                            'icon' => [
+                                'symbol' => '🚢',
+                                'class' => 'text-primary'
+                            ]
+                        ],
+                        'Repair' => [
+                            'field' => 'estimated_fixing_completion',
+                            'label' => 'Estimated fixing completion',
+                            'icon' => [
+                                'symbol' => '🛠️',
+                                'class' => 'text-warning'
+                            ]
+                        ],
+                        'Ready' => [
+                            'field' => 'estimated_pickup_delivery',
+                            'label' => 'Estimated pickup/delivery',
+                            'icon' => [
+                                'symbol' => '🚚',
+                                'class' => 'text-success'
+                            ]
+                        ],
+                        'Delivered' => [
+                            'field' => 'estimated_pickup_delivery',
+                            'label' => 'Estimated pickup/delivery',
+                            'icon' => [
+                                'symbol' => '🚚',
+                                'class' => 'text-success'
+                            ]
+                        ],
+                    ];
                     
                     foreach ($statuses as $index => $status):
                         $isActive = $index < $currentIndex;
                         $isCurrent = $index === $currentIndex;
                         $class = $isActive ? 'active' : ($isCurrent ? 'current' : '');
                         $hasTimestamp = isset($statusTimestamps[$status]);
+                        $estimatedInfo = null;
+                        
+                        if (isset($estimatedMap[$status])) {
+                            $field = $estimatedMap[$status]['field'];
+                            if (!empty($order[$field])) {
+                                $estimatedInfo = [
+                                    'label' => $estimatedMap[$status]['label'],
+                                    'value' => formatDate($order[$field]),
+                                    'icon' => $estimatedMap[$status]['icon']
+                                ];
+                            }
+                        }
                     ?>
                         <div class="timeline-item <?php echo $class; ?>">
                             <h6><?php echo $statusLabels[$status]; ?></h6>
@@ -215,6 +254,16 @@ $payments = $paymentsStmt->fetchAll();
                                 <p class="text-muted small mb-0">
                                     <i class="bi bi-clock"></i>
                                     In Progress
+                                </p>
+                            <?php endif; ?>
+                            
+                            <?php if ($estimatedInfo): ?>
+                                <p class="text-muted small mb-0">
+                                    <?php if (!empty($estimatedInfo['icon'])): ?>
+                                        <span class="me-1 <?php echo $estimatedInfo['icon']['class'] ?? ''; ?>"><?php echo $estimatedInfo['icon']['symbol'] ?? ''; ?></span>
+                                    <?php endif; ?>
+                                    <?php echo $estimatedInfo['label']; ?>:
+                                    <strong><?php echo $estimatedInfo['value']; ?></strong>
                                 </p>
                             <?php endif; ?>
                         </div>
@@ -460,6 +509,41 @@ $payments = $paymentsStmt->fetchAll();
                         <p><strong>Last Updated:</strong> <?php echo formatDateTime($order['updated_at']); ?></p>
                     </div>
                 </div>
+
+                <!-- Estimated Dates -->
+                <?php if (!empty($order['estimated_arrival_ghana']) || !empty($order['estimated_fixing_completion']) || !empty($order['estimated_pickup_delivery'])): ?>
+                <div class="card-modern mb-4 animate-in">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-calendar-event"></i> Important Dates</h5>
+                    </div>
+                    <div class="card-body">
+                        <?php if (!empty($order['estimated_arrival_ghana'])): ?>
+                            <div class="mb-3 pb-3 border-bottom">
+                                <p class="mb-1"><i class="bi bi-ship text-primary"></i> <strong>Estimated Arrival to Ghana</strong></p>
+                                <p class="mb-0 text-muted"><?php echo formatDate($order['estimated_arrival_ghana']); ?></p>
+                            </div>
+                        <?php endif; ?>
+                        
+                        <?php if (!empty($order['estimated_fixing_completion'])): ?>
+                            <div class="mb-3 pb-3 border-bottom">
+                                <p class="mb-1"><i class="bi bi-tools text-warning"></i> <strong>Estimated Fixing Completion</strong></p>
+                                <p class="mb-0 text-muted"><?php echo formatDate($order['estimated_fixing_completion']); ?></p>
+                            </div>
+                        <?php endif; ?>
+                        
+                        <?php if (!empty($order['estimated_pickup_delivery'])): ?>
+                            <div class="mb-0">
+                                <p class="mb-1"><i class="bi bi-truck text-success"></i> <strong>Estimated Pickup/Delivery</strong></p>
+                                <p class="mb-0 text-muted"><?php echo formatDate($order['estimated_pickup_delivery']); ?></p>
+                            </div>
+                        <?php endif; ?>
+                        
+                        <div class="alert alert-info mt-3 mb-0">
+                            <small><i class="bi bi-info-circle"></i> These are estimated dates and may change based on circumstances.</small>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
 
                 <!-- Financial Summary -->
                 <div class="card-modern mb-4 animate-in">
