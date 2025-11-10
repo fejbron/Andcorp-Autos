@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS orders (
 CREATE TABLE IF NOT EXISTS vehicles (
     id INT AUTO_INCREMENT PRIMARY KEY,
     order_id INT UNIQUE NOT NULL,
-    auction_source ENUM('copart', 'iaa') NOT NULL,
+    auction_source ENUM('copart', 'iaa', 'sca', 'tgna', 'manheim', 'texas_metro') NOT NULL,
     listing_url VARCHAR(500),
     lot_number VARCHAR(100),
     vin VARCHAR(17),

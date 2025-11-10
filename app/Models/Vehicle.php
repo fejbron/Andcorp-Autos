@@ -14,7 +14,7 @@ class Vehicle {
             throw new InvalidArgumentException('Invalid order ID');
         }
         
-        $auctionSource = Security::validateEnum($data['auction_source'] ?? '', ['copart', 'iaa']) 
+        $auctionSource = Security::validateEnum($data['auction_source'] ?? '', ['copart', 'iaa', 'sca', 'tgna', 'manheim', 'texas_metro']) 
             ? $data['auction_source'] 
             : 'copart';
         
@@ -79,7 +79,7 @@ class Vehicle {
             
             if ($key === 'auction_source') {
                 $fields[] = "auction_source = :auction_source";
-                $params[':auction_source'] = Security::validateEnum($value, ['copart', 'iaa']) ? $value : 'copart';
+                $params[':auction_source'] = Security::validateEnum($value, ['copart', 'iaa', 'sca', 'tgna', 'manheim', 'texas_metro']) ? $value : 'copart';
             } elseif ($key === 'listing_url') {
                 $fields[] = "listing_url = :listing_url";
                 $params[':listing_url'] = !empty($value) ? Security::sanitizeUrl($value) : null;

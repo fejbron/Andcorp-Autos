@@ -17,7 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $validator->required('customer_id', $_POST['customer_id'] ?? '')
               ->integer('customer_id', $_POST['customer_id'] ?? '');
     $validator->required('auction_source', $_POST['auction_source'] ?? '')
-              ->in('auction_source', $_POST['auction_source'] ?? '', ['copart', 'iaa']);
+              ->in('auction_source', $_POST['auction_source'] ?? '', ['copart', 'iaa', 'sca', 'tgna', 'manheim', 'texas_metro']);
     $validator->required('make', $_POST['make'] ?? '')
               ->maxLength('make', $_POST['make'] ?? '', 100);
     $validator->required('model', $_POST['model'] ?? '')
@@ -233,6 +233,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                         <option value="sca" <?php echo old('auction_source') === 'sca' ? 'selected' : ''; ?>>SCA Auction</option>
                                         <option value="tgna" <?php echo old('auction_source') === 'tgna' ? 'selected' : ''; ?>>The Great Northern Auction (TGNA)</option>
                                         <option value="manheim" <?php echo old('auction_source') === 'manheim' ? 'selected' : ''; ?>>Manheim Auctions</option>
+                                        <option value="texas_metro" <?php echo old('auction_source') === 'texas_metro' ? 'selected' : ''; ?>>Texas Metro Auction</option>
                                     </select>
                                     <?php if (error('auction_source')): ?>
                                         <div class="invalid-feedback"><?php echo error('auction_source'); ?></div>

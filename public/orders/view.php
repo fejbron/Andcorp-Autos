@@ -60,6 +60,11 @@ $customsStmt = $db->prepare("SELECT * FROM customs_clearing WHERE order_id = :or
 $customsStmt->execute([':order_id' => $orderId]);
 $customs = $customsStmt->fetch();
 
+// Get activity logs for status changes
+$activityStmt = $db->prepare("SELECT * FROM activity_logs WHERE order_id = :order_id ORDER BY created_at ASC");
+$activityStmt->execute([':order_id' => $orderId]);
+$activityLogs = $activityStmt->fetchAll();
+
 // Inspection reports
 $inspectionModel = new InspectionReport();
 $inspections = $inspectionModel->findByOrderId($orderId);
@@ -165,19 +170,51 @@ $payments = $paymentsStmt->fetchAll();
                         'Delivered' => 'Delivered'
                     ];
                     
+                    // Build map of status to timestamp from activity logs
+                    $statusTimestamps = [];
+                    $statusTimestamps['Pending'] = $order['created_at']; // Order creation date
+                    
+                    foreach ($activityLogs as $log) {
+                        // Check if this log is about a status change
+                        if (strpos($log['description'], 'status changed to') !== false || 
+                            strpos($log['description'], 'Status updated to') !== false) {
+                            // Extract status from description
+                            foreach ($statuses as $status) {
+                                if (stripos($log['description'], $status) !== false) {
+                                    // Only record the first time each status was reached
+                                    if (!isset($statusTimestamps[$status])) {
+                                        $statusTimestamps[$status] = $log['created_at'];
+                                    }
+                                }
+                            }
+                        } elseif ($log['action'] === 'order_created') {
+                            $statusTimestamps['Pending'] = $log['created_at'];
+                        }
+                    }
+                    
                     $currentIndex = array_search($order['status'], $statuses);
                     
                     foreach ($statuses as $index => $status):
                         $isActive = $index < $currentIndex;
                         $isCurrent = $index === $currentIndex;
                         $class = $isActive ? 'active' : ($isCurrent ? 'current' : '');
+                        $hasTimestamp = isset($statusTimestamps[$status]);
                     ?>
                         <div class="timeline-item <?php echo $class; ?>">
                             <h6><?php echo $statusLabels[$status]; ?></h6>
-                            <?php if ($isActive || $isCurrent): ?>
+                            <?php if ($hasTimestamp): ?>
                                 <p class="text-muted small mb-0">
-                                    <i class="bi bi-check-circle text-success"></i>
-                                    <?php echo $isCurrent ? 'In Progress' : 'Completed'; ?>
+                                    <i class="bi bi-<?php echo $isCurrent ? 'clock' : 'check-circle text-success'; ?>"></i>
+                                    <?php echo $isCurrent ? 'Current' : 'Completed'; ?>
+                                </p>
+                                <p class="text-muted small mb-0">
+                                    <i class="bi bi-calendar-event"></i>
+                                    <?php echo formatDateTime($statusTimestamps[$status]); ?>
+                                </p>
+                            <?php elseif ($isCurrent): ?>
+                                <p class="text-muted small mb-0">
+                                    <i class="bi bi-clock"></i>
+                                    In Progress
                                 </p>
                             <?php endif; ?>
                         </div>

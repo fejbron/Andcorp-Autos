@@ -100,7 +100,7 @@ A comprehensive web application for managing international car purchases from ma
 
 - **Order Features**:
   - VIN tracking
-  - Auction source tracking (Copart, IAA, SCA, TGNA, Manheim)
+  - Auction source tracking (Copart, IAA, SCA, TGNA, Manheim, Texas Metro)
   - Vehicle details (make, model, year, color, trim)
   - Document attachments
   - Status history

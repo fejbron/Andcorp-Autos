@@ -18,16 +18,46 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $endDate)) {
     $endDate = date('Y-m-d');
 }
 
-// Get orders in date range
+// Pagination for orders table
+$page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+$perPage = 20;
+$offset = ($page - 1) * $perPage;
+
+// Get total count of orders in date range
+$countSql = "SELECT COUNT(*) as total
+             FROM orders o
+             WHERE DATE(o.created_at) BETWEEN :start_date AND :end_date";
+$countStmt = $db->prepare($countSql);
+$countStmt->execute([':start_date' => $startDate, ':end_date' => $endDate]);
+$totalOrdersInRange = $countStmt->fetch()['total'];
+$totalPages = ceil($totalOrdersInRange / $perPage);
+
+// Get paginated orders in date range
 $sql = "SELECT o.*, u.first_name, u.last_name, u.email 
         FROM orders o
         JOIN customers c ON o.customer_id = c.id
         JOIN users u ON c.user_id = u.id
         WHERE DATE(o.created_at) BETWEEN :start_date AND :end_date
-        ORDER BY o.created_at DESC";
+        ORDER BY o.created_at DESC
+        LIMIT :limit OFFSET :offset";
 $stmt = $db->prepare($sql);
-$stmt->execute([':start_date' => $startDate, ':end_date' => $endDate]);
-$orders = $stmt->fetchAll();
+$stmt->bindValue(':start_date', $startDate, PDO::PARAM_STR);
+$stmt->bindValue(':end_date', $endDate, PDO::PARAM_STR);
+$stmt->bindValue(':limit', $perPage, PDO::PARAM_INT);
+$stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+$stmt->execute();
+$paginatedOrders = $stmt->fetchAll();
+
+// Get all orders for statistics (without pagination)
+$allOrdersSql = "SELECT o.*, u.first_name, u.last_name, u.email 
+                 FROM orders o
+                 JOIN customers c ON o.customer_id = c.id
+                 JOIN users u ON c.user_id = u.id
+                 WHERE DATE(o.created_at) BETWEEN :start_date AND :end_date
+                 ORDER BY o.created_at DESC";
+$allOrdersStmt = $db->prepare($allOrdersSql);
+$allOrdersStmt->execute([':start_date' => $startDate, ':end_date' => $endDate]);
+$orders = $allOrdersStmt->fetchAll();
 
 // Calculate statistics
 $totalOrders = count($orders);
@@ -294,11 +324,16 @@ foreach ($monthlyResults as $result) {
 
         <!-- Recent Orders -->
         <div class="card-modern animate-in">
-            <div class="card-header">
+            <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0"><i class="bi bi-list-ul"></i> Orders in Selected Period</h5>
+                <?php if (!empty($paginatedOrders)): ?>
+                    <span class="badge bg-primary">
+                        <?php echo $totalOrdersInRange; ?> total orders
+                    </span>
+                <?php endif; ?>
             </div>
             <div class="card-body">
-                <?php if (empty($orders)): ?>
+                <?php if (empty($paginatedOrders)): ?>
                     <p class="text-muted text-center">No orders in this date range</p>
                 <?php else: ?>
                     <div class="table-responsive">
@@ -309,30 +344,100 @@ foreach ($monthlyResults as $result) {
                                     <th>Customer</th>
                                     <th>Status</th>
                                     <th>Total</th>
-                                    <th>Paid</th>
+                                    <th>Total Paid</th>
                                     <th>Date</th>
+                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach (array_slice($orders, 0, 20) as $order): ?>
+                                <?php foreach ($paginatedOrders as $order): ?>
                                     <tr>
                                         <td><strong><?php echo $order['order_number']; ?></strong></td>
-                                        <td><?php echo $order['first_name'] . ' ' . $order['last_name']; ?></td>
+                                        <td>
+                                            <?php echo $order['first_name'] . ' ' . $order['last_name']; ?><br>
+                                            <small class="text-muted"><?php echo $order['email']; ?></small>
+                                        </td>
                                         <td>
                                             <span class="badge bg-<?php echo getStatusBadgeClass($order['status']); ?>">
                                                 <?php echo getStatusLabel($order['status']); ?>
                                             </span>
                                         </td>
                                         <td><?php echo formatCurrency($order['total_cost'], $order['currency']); ?></td>
-                                        <td><?php echo formatCurrency($order['deposit_amount'], $order['currency']); ?></td>
+                                        <td><?php echo formatCurrency($order['total_deposits'] ?? 0, $order['currency']); ?></td>
                                         <td><?php echo formatDate($order['created_at']); ?></td>
+                                        <td>
+                                            <a href="<?php echo url('admin/orders/edit.php?id=' . $order['id']); ?>" 
+                                               class="btn btn-sm btn-outline-primary">
+                                                <i class="bi bi-eye"></i> View
+                                            </a>
+                                        </td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>
                         </table>
                     </div>
-                    <?php if (count($orders) > 20): ?>
-                        <p class="text-center text-muted mt-3">Showing 20 of <?php echo count($orders); ?> orders</p>
+
+                    <!-- Pagination Controls -->
+                    <?php if ($totalPages > 1): ?>
+                        <nav aria-label="Orders pagination" class="mt-4">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div class="text-muted">
+                                    Showing <?php echo $offset + 1; ?> to <?php echo min($offset + $perPage, $totalOrdersInRange); ?> of <?php echo $totalOrdersInRange; ?> orders
+                                </div>
+                                <ul class="pagination mb-0">
+                                    <!-- Previous Button -->
+                                    <li class="page-item <?php echo $page <= 1 ? 'disabled' : ''; ?>">
+                                        <a class="page-link" href="?page=<?php echo $page - 1; ?>&start_date=<?php echo urlencode($startDate); ?>&end_date=<?php echo urlencode($endDate); ?>" 
+                                           aria-label="Previous">
+                                            <span aria-hidden="true">&laquo;</span>
+                                        </a>
+                                    </li>
+
+                                    <!-- Page Numbers -->
+                                    <?php
+                                    $startPage = max(1, $page - 2);
+                                    $endPage = min($totalPages, $page + 2);
+                                    
+                                    // Show first page if not in range
+                                    if ($startPage > 1): ?>
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page=1&start_date=<?php echo urlencode($startDate); ?>&end_date=<?php echo urlencode($endDate); ?>">1</a>
+                                        </li>
+                                        <?php if ($startPage > 2): ?>
+                                            <li class="page-item disabled"><span class="page-link">...</span></li>
+                                        <?php endif; ?>
+                                    <?php endif; ?>
+
+                                    <?php for ($i = $startPage; $i <= $endPage; $i++): ?>
+                                        <li class="page-item <?php echo $i === $page ? 'active' : ''; ?>">
+                                            <a class="page-link" href="?page=<?php echo $i; ?>&start_date=<?php echo urlencode($startDate); ?>&end_date=<?php echo urlencode($endDate); ?>">
+                                                <?php echo $i; ?>
+                                            </a>
+                                        </li>
+                                    <?php endfor; ?>
+
+                                    <!-- Show last page if not in range -->
+                                    <?php if ($endPage < $totalPages): ?>
+                                        <?php if ($endPage < $totalPages - 1): ?>
+                                            <li class="page-item disabled"><span class="page-link">...</span></li>
+                                        <?php endif; ?>
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page=<?php echo $totalPages; ?>&start_date=<?php echo urlencode($startDate); ?>&end_date=<?php echo urlencode($endDate); ?>">
+                                                <?php echo $totalPages; ?>
+                                            </a>
+                                        </li>
+                                    <?php endif; ?>
+
+                                    <!-- Next Button -->
+                                    <li class="page-item <?php echo $page >= $totalPages ? 'disabled' : ''; ?>">
+                                        <a class="page-link" href="?page=<?php echo $page + 1; ?>&start_date=<?php echo urlencode($startDate); ?>&end_date=<?php echo urlencode($endDate); ?>" 
+                                           aria-label="Next">
+                                            <span aria-hidden="true">&raquo;</span>
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
+                        </nav>
                     <?php endif; ?>
                 <?php endif; ?>
             </div>

@@ -26,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     $validator = new Validator();
     $validator->required('auction_source', $_POST['auction_source'] ?? '')
-              ->in('auction_source', $_POST['auction_source'] ?? '', ['copart', 'iaa']);
+              ->in('auction_source', $_POST['auction_source'] ?? '', ['copart', 'iaa', 'sca', 'tgna', 'manheim', 'texas_metro']);
     $validator->required('make', $_POST['make'] ?? '')
               ->maxLength('make', $_POST['make'] ?? '', 100);
     $validator->required('model', $_POST['model'] ?? '')
@@ -65,7 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $vehicleModel = new Vehicle();
             $vehicleModel->create([
                 'order_id' => $orderId,
-                'auction_source' => Security::validateEnum($_POST['auction_source'], ['copart', 'iaa']) ? $_POST['auction_source'] : 'copart',
+                'auction_source' => Security::validateEnum($_POST['auction_source'], ['copart', 'iaa', 'sca', 'tgna', 'manheim', 'texas_metro']) ? $_POST['auction_source'] : 'copart',
                 'listing_url' => !empty($_POST['listing_url']) ? Security::sanitizeUrl($_POST['listing_url']) : null,
                 'lot_number' => !empty($_POST['lot_number']) ? Security::sanitizeString($_POST['lot_number'], 100) : null,
                 'vin' => !empty($_POST['vin']) ? Security::sanitizeString(strtoupper($_POST['vin']), 17) : null,
@@ -160,6 +160,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                         <option value="sca" <?php echo old('auction_source') === 'sca' ? 'selected' : ''; ?>>SCA Auction</option>
                                         <option value="tgna" <?php echo old('auction_source') === 'tgna' ? 'selected' : ''; ?>>The Great Northern Auction (TGNA)</option>
                                         <option value="manheim" <?php echo old('auction_source') === 'manheim' ? 'selected' : ''; ?>>Manheim Auctions</option>
+                                        <option value="texas_metro" <?php echo old('auction_source') === 'texas_metro' ? 'selected' : ''; ?>>Texas Metro Auction</option>
                                     </select>
                                     <?php if (error('auction_source')): ?>
                                         <div class="invalid-feedback"><?php echo error('auction_source'); ?></div>

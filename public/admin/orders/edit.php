@@ -113,7 +113,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Update vehicle if exists
             if ($vehicle && !empty($_POST['make']) && !empty($_POST['model']) && !empty($_POST['year'])) {
                 $vehicleModel->update($orderId, [
-                    'auction_source' => Security::validateEnum($_POST['auction_source'] ?? 'copart', ['copart', 'iaa']) ? $_POST['auction_source'] : 'copart',
+                    'auction_source' => Security::validateEnum($_POST['auction_source'] ?? 'copart', ['copart', 'iaa', 'sca', 'tgna', 'manheim', 'texas_metro']) ? $_POST['auction_source'] : 'copart',
                     'listing_url' => !empty($_POST['listing_url']) ? Security::sanitizeUrl($_POST['listing_url']) : null,
                     'lot_number' => !empty($_POST['lot_number']) ? Security::sanitizeString($_POST['lot_number'], 100) : null,
                     'vin' => !empty($_POST['vin']) ? Security::sanitizeString(strtoupper($_POST['vin']), 17) : null,
@@ -130,14 +130,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ]);
             }
             
-            // Log activity
-            Auth::logOrderActivity(Auth::userId(), $orderId, 'order_updated', 'Order updated by staff');
-            
             // Send notification if status changed
             $newStatus = Security::sanitizeStatus($_POST['status'] ?? $order['status']);
             if ($newStatus !== $order['status']) {
+                // Log status change specifically
+                Auth::logOrderActivity(Auth::userId(), $orderId, 'status_changed', 
+                    "Order status changed from '{$order['status']}' to '{$newStatus}'");
+                
                 $notificationModel = new Notification();
                 $notificationModel->sendOrderUpdate($orderId, $newStatus);
+            } else {
+                // Log general update
+                Auth::logOrderActivity(Auth::userId(), $orderId, 'order_updated', 'Order updated by staff');
             }
             
             clearOld();
@@ -154,6 +158,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Refresh order data
 $order = $orderModel->findById($orderId);
 $vehicle = $vehicleModel->findByOrderId($orderId);
+
+// Get activity logs for this order
+$db = Database::getInstance()->getConnection();
+$activityStmt = $db->prepare("
+    SELECT al.*, u.first_name, u.last_name 
+    FROM activity_logs al
+    LEFT JOIN users u ON al.user_id = u.id
+    WHERE al.order_id = :order_id 
+    ORDER BY al.created_at DESC 
+    LIMIT 10
+");
+$activityStmt->execute([':order_id' => $orderId]);
+$activities = $activityStmt->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -373,6 +390,7 @@ $vehicle = $vehicleModel->findByOrderId($orderId);
                                                     <option value="sca" <?php echo $vehicle['auction_source'] === 'sca' ? 'selected' : ''; ?>>SCA Auction</option>
                                                     <option value="tgna" <?php echo $vehicle['auction_source'] === 'tgna' ? 'selected' : ''; ?>>The Great Northern Auction (TGNA)</option>
                                                     <option value="manheim" <?php echo $vehicle['auction_source'] === 'manheim' ? 'selected' : ''; ?>>Manheim Auctions</option>
+                                                    <option value="texas_metro" <?php echo $vehicle['auction_source'] === 'texas_metro' ? 'selected' : ''; ?>>Texas Metro Auction</option>
                                                 </select>
                                             </div>
                                             
@@ -604,6 +622,51 @@ $vehicle = $vehicleModel->findByOrderId($orderId);
                                                 <?php endforeach; ?>
                                             </tbody>
                                         </table>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+
+                        <!-- Recent Activity -->
+                        <div class="card-modern mb-4 animate-in">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="bi bi-clock-history"></i> Recent Activity</h5>
+                            </div>
+                            <div class="card-body">
+                                <?php if (empty($activities)): ?>
+                                    <p class="text-muted small mb-0">No activity recorded yet</p>
+                                <?php else: ?>
+                                    <div class="activity-timeline">
+                                        <?php foreach ($activities as $activity): ?>
+                                            <div class="activity-item mb-3 pb-3 border-bottom">
+                                                <div class="d-flex align-items-start">
+                                                    <div class="flex-shrink-0">
+                                                        <i class="bi bi-<?php 
+                                                            echo match($activity['action']) {
+                                                                'order_created' => 'plus-circle text-success',
+                                                                'status_changed' => 'arrow-right-circle text-primary',
+                                                                'order_updated' => 'pencil text-info',
+                                                                'document_uploaded' => 'file-earmark-arrow-up text-warning',
+                                                                'deposit_added' => 'cash-coin text-success',
+                                                                default => 'circle text-secondary'
+                                                            };
+                                                        ?>"></i>
+                                                    </div>
+                                                    <div class="flex-grow-1 ms-2">
+                                                        <p class="mb-0 small">
+                                                            <strong><?php echo htmlspecialchars($activity['first_name'] . ' ' . $activity['last_name']); ?></strong>
+                                                        </p>
+                                                        <p class="mb-1 small text-muted">
+                                                            <?php echo htmlspecialchars($activity['description']); ?>
+                                                        </p>
+                                                        <p class="mb-0 text-muted" style="font-size: 0.75rem;">
+                                                            <i class="bi bi-clock"></i>
+                                                            <?php echo formatDateTime($activity['created_at']); ?>
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        <?php endforeach; ?>
                                     </div>
                                 <?php endif; ?>
                             </div>

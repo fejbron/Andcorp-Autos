@@ -155,6 +155,44 @@ If you encounter any issues during migration:
 3. Ensure all files were updated (check file modification dates)
 4. Contact technical support with specific error messages
 
+## Additional Migration: Texas Metro Auction Source
+
+### Overview
+This migration adds "Texas Metro Auction" as a new auction source option alongside existing sources (Copart, IAA, SCA, TGNA, Manheim).
+
+### Migration Steps
+
+**Step 1: Backup Database** (if not already done above)
+```bash
+mysqldump -u your_username -p andcorp_autos > backup_before_auction_update_$(date +%Y%m%d).sql
+```
+
+**Step 2: Run Auction Source Migration**
+```bash
+mysql -u your_username -p andcorp_autos < database/add_texas_metro_auction_2025.sql
+```
+
+This will:
+- Update the `vehicles` table `auction_source` ENUM field
+- Add 'texas_metro' as a valid auction source
+- Maintain all existing vehicle data (no data loss)
+
+**Step 3: Verify Update**
+After running the migration, verify it worked:
+
+1. Log in to admin dashboard
+2. Create or edit an order
+3. Check the "Auction Source" dropdown includes "Texas Metro Auction"
+4. Save an order with Texas Metro Auction and verify it saves correctly
+
+### Available Auction Sources (After Migration)
+1. Copart
+2. IAA (Insurance Auto Auctions)
+3. SCA Auction
+4. The Great Northern Auction (TGNA)
+5. Manheim Auctions
+6. Texas Metro Auction *(NEW)*
+
 ## Notes
 
 - All existing orders will retain their current status
@@ -162,4 +200,6 @@ If you encounter any issues during migration:
 - Email notifications for new statuses default to enabled
 - The order Model dynamically reads statuses from the database, so changes take effect immediately
 - Customer-facing displays automatically adapt to the new status flow
+- All existing vehicle records retain their auction source values
+- New auction source option is available immediately after migration
 

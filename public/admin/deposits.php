@@ -29,11 +29,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_deposit']) && 
 $statusFilter = !empty($_GET['status']) ? $_GET['status'] : null;
 $searchQuery = Security::sanitizeString($_GET['search'] ?? '', 255);
 
-// Get deposits
+// Pagination
+$page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+$perPage = 20;
+$offset = ($page - 1) * $perPage;
+
+// Get deposits with pagination
 if ($searchQuery) {
     $deposits = $depositModel->search($searchQuery);
+    $totalDeposits = count($deposits);
+    $deposits = array_slice($deposits, $offset, $perPage);
+    $totalPages = ceil($totalDeposits / $perPage);
 } else {
-    $deposits = $depositModel->getAll($statusFilter, 100, 0);
+    // Get total count for pagination
+    $db = Database::getInstance()->getConnection();
+    $countSql = "SELECT COUNT(*) as total FROM deposits";
+    if ($statusFilter) {
+        $countSql .= " WHERE status = :status";
+    }
+    $countStmt = $db->prepare($countSql);
+    if ($statusFilter) {
+        $countStmt->execute([':status' => $statusFilter]);
+    } else {
+        $countStmt->execute();
+    }
+    $totalDeposits = $countStmt->fetch()['total'];
+    $totalPages = ceil($totalDeposits / $perPage);
+    
+    $deposits = $depositModel->getAll($statusFilter, $perPage, $offset);
 }
 
 // Get stats
@@ -152,8 +175,11 @@ $title = "Deposit Management";
 
                 <!-- Deposits Table -->
                 <div class="card-modern">
-                    <div class="card-header">
-                        <h5 class="mb-0"><i class="bi bi-list-ul"></i> Deposit Records (<?php echo count($deposits); ?>)</h5>
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-list-ul"></i> Deposit Records</h5>
+                        <span class="badge bg-primary">
+                            <?php echo $totalDeposits; ?> total
+                        </span>
                     </div>
                     <div class="card-body p-0">
                         <?php if (empty($deposits)): ?>
@@ -252,6 +278,69 @@ $title = "Deposit Management";
                                     </tbody>
                                 </table>
                             </div>
+
+                            <!-- Pagination Controls -->
+                            <?php if ($totalPages > 1): ?>
+                                <nav aria-label="Deposits pagination" class="mt-4 px-3 pb-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <div class="text-muted">
+                                            Showing <?php echo $offset + 1; ?> to <?php echo min($offset + $perPage, $totalDeposits); ?> of <?php echo $totalDeposits; ?> deposits
+                                        </div>
+                                        <ul class="pagination mb-0">
+                                            <!-- Previous Button -->
+                                            <li class="page-item <?php echo $page <= 1 ? 'disabled' : ''; ?>">
+                                                <a class="page-link" href="?page=<?php echo $page - 1; ?>&status=<?php echo urlencode($statusFilter ?? ''); ?>&search=<?php echo urlencode($searchQuery); ?>" 
+                                                   aria-label="Previous">
+                                                    <span aria-hidden="true">&laquo;</span>
+                                                </a>
+                                            </li>
+
+                                            <!-- Page Numbers -->
+                                            <?php
+                                            $startPage = max(1, $page - 2);
+                                            $endPage = min($totalPages, $page + 2);
+                                            
+                                            // Show first page if not in range
+                                            if ($startPage > 1): ?>
+                                                <li class="page-item">
+                                                    <a class="page-link" href="?page=1&status=<?php echo urlencode($statusFilter ?? ''); ?>&search=<?php echo urlencode($searchQuery); ?>">1</a>
+                                                </li>
+                                                <?php if ($startPage > 2): ?>
+                                                    <li class="page-item disabled"><span class="page-link">...</span></li>
+                                                <?php endif; ?>
+                                            <?php endif; ?>
+
+                                            <?php for ($i = $startPage; $i <= $endPage; $i++): ?>
+                                                <li class="page-item <?php echo $i === $page ? 'active' : ''; ?>">
+                                                    <a class="page-link" href="?page=<?php echo $i; ?>&status=<?php echo urlencode($statusFilter ?? ''); ?>&search=<?php echo urlencode($searchQuery); ?>">
+                                                        <?php echo $i; ?>
+                                                    </a>
+                                                </li>
+                                            <?php endfor; ?>
+
+                                            <!-- Show last page if not in range -->
+                                            <?php if ($endPage < $totalPages): ?>
+                                                <?php if ($endPage < $totalPages - 1): ?>
+                                                    <li class="page-item disabled"><span class="page-link">...</span></li>
+                                                <?php endif; ?>
+                                                <li class="page-item">
+                                                    <a class="page-link" href="?page=<?php echo $totalPages; ?>&status=<?php echo urlencode($statusFilter ?? ''); ?>&search=<?php echo urlencode($searchQuery); ?>">
+                                                        <?php echo $totalPages; ?>
+                                                    </a>
+                                                </li>
+                                            <?php endif; ?>
+
+                                            <!-- Next Button -->
+                                            <li class="page-item <?php echo $page >= $totalPages ? 'disabled' : ''; ?>">
+                                                <a class="page-link" href="?page=<?php echo $page + 1; ?>&status=<?php echo urlencode($statusFilter ?? ''); ?>&search=<?php echo urlencode($searchQuery); ?>" 
+                                                   aria-label="Next">
+                                                    <span aria-hidden="true">&raquo;</span>
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </nav>
+                            <?php endif; ?>
                         <?php endif; ?>
                     </div>
                 </div>
